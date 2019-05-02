@@ -10,7 +10,7 @@ sys.path.append('../')
 import os
 
 from cg_variants import *
-from callbacks import error_A_norm, residual_2_norm
+from callbacks import error_A_norm, residual_2_norm, print_k
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
@@ -38,7 +38,7 @@ def test_matrix(A,max_iter,title,preconditioner=None):
     methods = [hs_pcg,cg_pcg,m_pcg,gv_pcg,ch_pcg,pipe_m_pcg,pipe_m_pcg_b,pipe_ch_pcg,pipe_ch_pcg_b]
     
     # define callbacks to use
-    callbacks = [error_A_norm,residual_2_norm]
+    callbacks = [error_A_norm,residual_2_norm,print_k(max_iter//10)]
     
     prec = lambda x:x
     if preconditioner=='jacobi':
@@ -337,7 +337,7 @@ matrices += [
 ]
 
 matrices = [
-    ['bcsstk18',1500000,None], # tbd
+    ['bcsstk18',10000,None], # tbd
 ]
 
 #%%
