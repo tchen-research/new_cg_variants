@@ -51,6 +51,11 @@ def test_matrix(A,max_iter,title,preconditioner=None):
     # run methods
     trials={}
     for method in methods:
+        
+        # just to determine how many iterations for a given problem
+        if method not in [hs_pcg,cg_pcg]:
+            max_iter = 5
+        
         trials[method.__name__] = method(A,b,x0,max_iter,callbacks=callbacks,x_true=x_true,preconditioner=prec)
 
     np.save(f'./data/{title}_{preconditioner}',trials,allow_pickle=True)
@@ -337,7 +342,7 @@ matrices += [
 ]
 
 matrices = [
-    ['bcsstk18',10000,None], # tbd
+    ['bcsstk18',30000,None], # tbd
 ]
 
 #%%
