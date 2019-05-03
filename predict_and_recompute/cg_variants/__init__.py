@@ -67,7 +67,7 @@ from .cg_cg import cg_cg, cg_pcg
 from .gv_cg import gv_cg, gv_pcg
 from .m_cg import m_cg, m_pcg
 
-from .ch_cg import ch_cg, ch_cg_b, ch_pcg, ch_pcg_b
+from .ch_cg import ch_cg, ch_pcg
 from .pipe_ch_cg import pipe_ch_cg, pipe_ch_cg_b, pipe_ch_pcg, pipe_ch_pcg_b
 from .pipe_m_cg import pipe_m_cg, pipe_m_cg_b, pipe_m_pcg, pipe_m_pcg_b
 

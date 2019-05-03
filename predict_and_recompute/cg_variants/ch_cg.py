@@ -65,7 +65,7 @@ def ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
         p_k    =  r_k   +    b_k * p_k1
         s_k    =  A     @ p_k
         mu_k   =  p_k   @ s_k 
-        del_k  =  r_k   @ st_k if variant == 'b' else rt_k @ s_k # could do rt_k @ s_k or p_k @ s_k
+        del_k  =  r_k   @ st_k
         gam_k  =  s_k   @ s_k
         nu_k   =  r_k   @ r_k
         a_k    =  nu_k / mu_k
@@ -75,9 +75,6 @@ def ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
             callback(**locals())
             
     return output
-
-def ch_cg_b(*args,**kwargs):
-    return ch_cg(*args,variant='b',**kwargs)
 
 def ch_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,variant='',callbacks=[],**kwargs):
     '''
@@ -90,7 +87,7 @@ def ch_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,variant='',callbacks=[],**k
     
     # initialize
     output = {}
-    output['name'] = f'ch2{variant}_pcg'
+    output['name'] = f"ch_pcg"
     output['max_iter'] = max_iter
     
     x_k    =  np.copy(x0)
@@ -142,7 +139,7 @@ def ch_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,variant='',callbacks=[],**k
         s_k    =  A     @ p_k
         st_k   =  preconditioner(s_k)
         mu_k   =  p_k   @ s_k 
-        del_k  =  r_k   @ st_k if variant == 'b' else rt_k @ s_k # could do rt_k @ s_k or p_k @ s_k
+        del_k  =  r_k   @ st_k
         gam_k  =  st_k  @ s_k
         nu_k   =  rt_k  @ r_k 
         a_k    =  nu_k / mu_k
@@ -153,5 +150,3 @@ def ch_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,variant='',callbacks=[],**k
             
     return output
 
-def ch_pcg_b(*args,**kwargs):
-    return ch_pcg(*args,variant='b',**kwargs)

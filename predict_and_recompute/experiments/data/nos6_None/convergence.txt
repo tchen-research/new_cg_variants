@@ -1,0 +1,1 @@
+{\tt nos6 } & - & 675 & 3255& {551}& {555}& {582}& {555}& \tableemph{672}& \tableemph{661}& \tableemph{636}& {601}& {589}&{-12.21}&{-12.28}&{-12.23}&{-12.22}&\tableemph{-6.67}&\tableemph{-8.32}&\tableemph{-8.41}&\tableemph{-10.21}&\tableemph{-10.21}\\ 

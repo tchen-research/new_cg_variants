@@ -287,7 +287,6 @@ matrices += [
     ['nos6',2400,None],
     ['nos7',7000,None], # GVCG doesn't even work.. 
 ]
-"""
 
 matrices += [
     ['bcsstm19',1100,None],
@@ -299,7 +298,6 @@ matrices += [
     ['bcsstm25',130000,None],
 ]
 
-"""
 matrices += [
     ['494_bus',2500,None],
     ['662_bus',1200,None],
@@ -314,7 +312,7 @@ matrices += [
     ['685_bus',350,'jacobi'],
     ['1138_bus',1300,'jacobi'],
 ]
-
+"""
 matrices += [
     ['s1rmq4m1',1000,'jacobi'],
     ['s1rmt3m1',1200,'jacobi'],
@@ -339,12 +337,11 @@ matrices += [
     ['s3rmt3m3',250000,None],
 ]
 
-matrices = [
+matrices += [
     ['s3dkq4m2',60000,'jacobi'], # 40k for pipe_ch_pcg(b) to converge
     ['s3dkt3m2',75000,'jacobi'], 
     ['bcsstk18',1750000,None], # tbd for ch variants
 ]
-"""
 
 #%%
 # NOW RUN TESTS
