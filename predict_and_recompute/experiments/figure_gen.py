@@ -177,7 +177,7 @@ def variant_color(name):
         if name[:3] == string:
             return '#93a1a1'
     
-    return '#073662'
+    return '#073642'
 
 #%%
 
@@ -242,7 +242,6 @@ def plot_matrix_test(title,preconditioner=None,quantity='error_A_norm'):
 
 matrices = []
 
-"""
 matrices += [
     ['model_48_8_3',110,None],
     ['model_48_8_3',200,'jacobi'], 
@@ -312,14 +311,14 @@ matrices += [
     ['685_bus',350,'jacobi'],
     ['1138_bus',1300,'jacobi'],
 ]
-"""
+
 matrices += [
     ['s1rmq4m1',1000,'jacobi'],
     ['s1rmt3m1',1200,'jacobi'],
     ['s2rmq4m1',2100,'jacobi'],
     ['s2rmt3m1',3000,'jacobi'],
-#    ['s3dkq4m2',60000,'jacobi'], # 40k for pipe_ch_pcg(b) to converge
-#    ['s3dkt3m2',75000,'jacobi'], 
+#    ['s3dkq4m2',60000,'jacobi'], # too big for github 
+    ['s3dkt3m2',75000,'jacobi'], 
     ['s3rmq4m1',12000,'jacobi'],
     ['s3rmt3m1',17000,'jacobi'],
     ['s3rmt3m3',40000,'jacobi'],
@@ -337,9 +336,10 @@ matrices += [
     ['s3rmt3m3',250000,None],
 ]
 
-matrices += [
-    ['s3dkq4m2',60000,'jacobi'], # 40k for pipe_ch_pcg(b) to converge
-    ['s3dkt3m2',75000,'jacobi'], 
+
+matrices = [
+#    ['s3dkq4m2',60000,'jacobi'], # 40k for pipe_ch_pcg(b) to converge
+#    ['s3dkt3m2',75000,'jacobi'], 
     ['bcsstk18',1750000,None], # tbd for ch variants
 ]
 
