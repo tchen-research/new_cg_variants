@@ -26,7 +26,7 @@ Then add a plot of this quantity in the `plot_matrix_test` function.
 You will need Python 3.6 or higher, since I use f-strings.
 If you do not have access to Python 3.6, you can replace all f-strings with other string formats and everything should work (if you have a reasonably recent versions of numpy and scipy).
 
-While lots of the experiments run almost instantly on a laptop, there are other experiments which require much longer (hours or days depnding on your hardware).
+While lots of the experiments run almost instantly on a laptop, there are other experiments which require much longer (hours or days depending on your hardware).
 The code is fairly modular, so you can test a single variant on a single matrix, and then regenerate the corresponding figure.
 This makes it easier to verify the convergence of a single variant on big problems, since you don't have to run all of the variants.
 
