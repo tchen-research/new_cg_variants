@@ -38,7 +38,7 @@ def test_matrix(A,max_iter,title,preconditioner=None):
     methods = [hs_pcg,cg_pcg,m_pcg,gv_pcg,ch_pcg,pipe_m_pcg,pipe_m_pcg_b,pipe_ch_pcg,pipe_ch_pcg_b]
     
     # define callbacks to use
-    callbacks = [error_A_norm,residual_2_norm,print_k(max_iter//10)]
+    callbacks = [error_A_norm,residual_2_norm,print_k(10)]
     
     prec = lambda x:x
     if preconditioner=='jacobi':
@@ -49,16 +49,10 @@ def test_matrix(A,max_iter,title,preconditioner=None):
 #        b = D@b
         
     # run methods
-    trials={}
+    os.system(f'mkdir -p ./data/{title}_{preconditioner}')
     for method in methods:
-        
-        # just to determine how many iterations for a given problem
-        if method not in [hs_pcg,cg_pcg]:
-            max_iter = 5
-        
-        trials[method.__name__] = method(A,b,x0,max_iter,callbacks=callbacks,x_true=x_true,preconditioner=prec)
-
-    np.save(f'./data/{title}_{preconditioner}',trials,allow_pickle=True)
+        trial = method(A,b,x0,max_iter,callbacks=callbacks,x_true=x_true,preconditioner=prec)
+        np.save(f'./data/{title}_{preconditioner}/{method.__name__}',trial,allow_pickle=True)
     
 #%%
 def gen_convergence_data(matrix_name,preconditioner=None):
@@ -73,7 +67,6 @@ def gen_convergence_data(matrix_name,preconditioner=None):
     nnz = A.nnz    
         
     # get convergence information
-    trials = np.load(f'./data/{matrix_name}_{preconditioner}.npy',allow_pickle=True).item()
     
     methods = ['hs_pcg','cg_pcg','m_pcg','ch_pcg','gv_pcg','pipe_m_pcg','pipe_ch_pcg','pipe_m_pcg_b','pipe_ch_pcg_b']
     
@@ -84,7 +77,7 @@ def gen_convergence_data(matrix_name,preconditioner=None):
     
     for method in methods:
         
-        trial = trials[method]
+        trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
         
         rel_error_A_norm = trial['error_A_norm']/trial['error_A_norm'][0]
 
@@ -95,11 +88,11 @@ def gen_convergence_data(matrix_name,preconditioner=None):
     # generate data string for tex table
     formatted_matrix_name = r'{\tt '+matrix_name.replace('_','\_')+r' }'
     
-    formatted_preconitioner = '-'
+    formatted_preconditioner = '-'
     if preconditioner == 'jacobi':
-        formatted_preconitioner = 'Jac.'
+        formatted_preconditioner = 'Jac.'
     
-    data = f"{formatted_matrix_name} & {formatted_preconitioner} & {n} & {nnz}"
+    data = f"{formatted_matrix_name} & {formatted_preconditioner} & {n} & {nnz}"
     
     data_iter = ''
     data_err = ''
@@ -114,7 +107,7 @@ def gen_convergence_data(matrix_name,preconditioner=None):
         data_err += f'&{me_bold_start}{{{min_errors[k]:1.2f}}}'
     
     data += data_iter + data_err + '\\\\ \n'
-    with open(f'./data/{matrix_name}_{preconditioner}_convergence.txt', 'w') as text_file:
+    with open(f'./data/{matrix_name}_{preconditioner}/convergence.txt', 'w') as text_file:
         text_file.write(data)
         
 #%%
@@ -123,11 +116,11 @@ def gen_convergence_table():
     merge all data from gen_convergence_data into single latex table
     """
     
-    os.chdir('./data/')
-    print(os.getcwd() + "\n")
-    os.system('cat *None_convergence.txt > ../figures/convergence_table_data.tex')
-    os.system('cat *jacobi_convergence.txt >> ../figures/convergence_table_data.tex')
-    os.chdir('..')
+#    os.chdir('./data/')
+#    print(os.getcwd() + "\n")
+    os.system('cat ./data/*None/*convergence.txt > ./figures/convergence_table_data.tex')
+    os.system('cat ./data/*jacobi/*convergence.txt >> ./figures/convergence_table_data.tex')
+#    os.chdir('..')
 
 #%%
 def variant_name(name):
@@ -209,19 +202,21 @@ def plot_matrix_test(title,preconditioner=None,quantity='error_A_norm'):
         ax.plot(np.arange(trial['max_iter'])[::skip],trial[quantity][::skip]/trial[quantity][0],label=lbl,linestyle=ls,color=cl,marker=ms,markevery=(int(vo*num_pts),num_pts//num_markers))
 
     # load data
-    trials = np.load(f'./data/{matrix_name}_{preconditioner}.npy',allow_pickle=True).item()
     
     
     f, (ax1, ax2, ax3) = plt.subplots(1, 3, sharex=True, sharey=True, figsize=(14,4))
     
     for method in ['hs_pcg', 'cg_pcg', 'm_pcg','ch_pcg']:
-        add_plot(trials[method],ax1)
+        trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
+        add_plot(trial,ax1)
 
     for method in ['hs_pcg', 'gv_pcg', 'pipe_m_pcg', 'pipe_m_pcg_b']:
-        add_plot(trials[method],ax2)
+        trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
+        add_plot(trial,ax2)
         
     for method in ['hs_pcg', 'gv_pcg', 'pipe_ch_pcg', 'pipe_ch_pcg_b']:
-        add_plot(trials[method],ax3)
+        trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
+        add_plot(trial,ax3)
         
     ax1.set_yscale('log')
     ax1.set_ylim(1e-16,5)
@@ -240,13 +235,14 @@ def plot_matrix_test(title,preconditioner=None,quantity='error_A_norm'):
     
     plt.subplots_adjust(wspace=.05, hspace=0)    
     plt.savefig(f'figures/{title}_{preconditioner}_{quantity}.pdf',bbox_inches='tight')
-#    plt.show()
+    plt.close()
     
 #%%
 # PICK MATRICES TO TEST
 
 matrices = []
 
+"""
 matrices += [
     ['model_48_8_3',110,None],
     ['model_48_8_3',200,'jacobi'], 
@@ -263,13 +259,13 @@ matrices += [
 ]
 
 matrices += [
-    ['bcsstk03',1250,None], #
+    ['bcsstk03',1250,None],
     ['bcsstk14',25000,None],
     ['bcsstk15',35000,None],
-    ['bcsstk16',900,None], #
+    ['bcsstk16',900,None],
     ['bcsstk17',45000,None],
-    ['bcsstk18',1500000,None], # tbd
-    ['bcsstk27',2300,None], #
+#    ['bcsstk18',1750000,None],
+    ['bcsstk27',2300,None],
 ]
 
 matrices += [
@@ -291,8 +287,8 @@ matrices += [
     ['nos6',2400,None],
     ['nos7',7000,None], # GVCG doesn't even work.. 
 ]
+"""
 
-# these are weird..
 matrices += [
     ['bcsstm19',1100,None],
     ['bcsstm20',700,None],
@@ -303,12 +299,14 @@ matrices += [
     ['bcsstm25',130000,None],
 ]
 
+"""
 matrices += [
     ['494_bus',2500,None],
     ['662_bus',1200,None],
     ['685_bus',950,None],
     ['1138_bus',5000,None],
 ]
+
 
 matrices += [
     ['494_bus',500,'jacobi'],
@@ -322,8 +320,8 @@ matrices += [
     ['s1rmt3m1',1200,'jacobi'],
     ['s2rmq4m1',2100,'jacobi'],
     ['s2rmt3m1',3000,'jacobi'],
-#    ['s3dkq4m2',75000,'jacobi'], # tbd n=90449
-#    ['s3dkt3m2',75000,'jacobi'], # tbd n=90449
+#    ['s3dkq4m2',60000,'jacobi'], # 40k for pipe_ch_pcg(b) to converge
+#    ['s3dkt3m2',75000,'jacobi'], 
     ['s3rmq4m1',12000,'jacobi'],
     ['s3rmt3m1',17000,'jacobi'],
     ['s3rmt3m3',40000,'jacobi'],
@@ -342,27 +340,24 @@ matrices += [
 ]
 
 matrices = [
-    ['bcsstk18',30000,None], # tbd
+    ['s3dkq4m2',60000,'jacobi'], # 40k for pipe_ch_pcg(b) to converge
+    ['s3dkt3m2',75000,'jacobi'], 
+    ['bcsstk18',1750000,None], # tbd for ch variants
 ]
+"""
 
 #%%
 # NOW RUN TESTS
 
-# add folders if they don't exist
-os.system('mkdir -p ./data/')
-os.system('mkdir -p ./figures/')
-
 for matrix_name,max_iter,preconditioner in matrices:
-    print(f'matrix: {matrix_name}')
+    print(f'matrix: {matrix_name}, preconditioner: {preconditioner}')
+    
     A = sp.sparse.csr_matrix(sp.io.mmread(f"../matrices/{matrix_name}.mtx"))
     test_matrix(A,max_iter,matrix_name,preconditioner)
     
-for matrix_name,max_iter,preconditioner in matrices:
     gen_convergence_data(matrix_name,preconditioner)
     
-gen_convergence_table()
-
-for matrix_name,max_iter,preconditioner in matrices:
-    print(f'matrix: {matrix_name}')
     plot_matrix_test(matrix_name,preconditioner,'error_A_norm')
     plot_matrix_test(matrix_name,preconditioner,'residual_2_norm')
+
+gen_convergence_table()
