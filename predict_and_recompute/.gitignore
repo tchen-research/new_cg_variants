@@ -1,2 +1,4 @@
-experiments/data
-experiments/figures
+__pycache__/
+experiments/data/bcsstk18_None.npy
+matrices/s3dkq4m2.mtx
+
