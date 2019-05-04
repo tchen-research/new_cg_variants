@@ -35,7 +35,7 @@ def test_matrix(A,max_iter,title,preconditioner=None):
 #    x_true = sp.sparse.linalg.spsolve(A,b)
 
     # define methods to use
-    methods = [hs_pcg,cg_pcg,m_pcg,gv_pcg,ch_pcg,pipe_m_pcg,pipe_m_pcg_b,pipe_ch_pcg,pipe_ch_pcg_b]
+    methods = [hs_pcg,cg_pcg,m_pcg,gv_pcg,ch_pcg,pipe_m_pcg,pipe_pr_m_pcg,pipe_ch_pcg,pipe_pr_ch_pcg]
     
     # define callbacks to use
     callbacks = [error_A_norm,residual_2_norm,print_k(10)]
@@ -68,7 +68,7 @@ def gen_convergence_data(matrix_name,preconditioner=None):
         
     # get convergence information
     
-    methods = ['hs_pcg','cg_pcg','m_pcg','ch_pcg','gv_pcg','pipe_m_pcg','pipe_ch_pcg','pipe_m_pcg_b','pipe_ch_pcg_b']
+    methods = ['hs_pcg','cg_pcg','m_pcg','ch_pcg','gv_pcg','pipe_m_pcg','pipe_ch_pcg','pipe_pr_m_pcg','pipe_pr_ch_pcg']
     
     min_iters = []
     min_errors = []
@@ -128,13 +128,11 @@ def variant_name(name):
     formatted_name = name.upper().replace('PCG','CG').replace('_','-')
 
     variant = ''
-    if formatted_name.find('-B') != -1:
-        formatted_name = formatted_name.replace('-B','')
-        variant = '(b)'
     
-    name = formatted_name.replace('PIPE','pipe')
+    formatted_name = formatted_name.replace('PR','pr')
+    formatted_name = formatted_name.replace('PIPE','pipe')
     
-    return f"\\textsc{{{formatted_name}}}{variant}"
+    return f"\\textsc{{{formatted_name}}}"
 
 def variant_marker(name):
     
@@ -164,7 +162,7 @@ def variant_offset(name,spacing):
 
 def variant_line_style(name):
     
-    if name.find('_b') != -1:
+    if name.find('pr') != -1:
         return '--'
     
     return '-'
@@ -180,6 +178,7 @@ def variant_color(name):
     return '#073642'
 
 #%%
+
 
 def plot_matrix_test(title,preconditioner=None,quantity='error_A_norm'):
     """
@@ -210,11 +209,11 @@ def plot_matrix_test(title,preconditioner=None,quantity='error_A_norm'):
         trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
         add_plot(trial,ax1)
 
-    for method in ['hs_pcg', 'gv_pcg', 'pipe_m_pcg', 'pipe_m_pcg_b']:
+    for method in ['hs_pcg', 'gv_pcg', 'pipe_m_pcg', 'pipe_pr_m_pcg']:
         trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
         add_plot(trial,ax2)
         
-    for method in ['hs_pcg', 'gv_pcg', 'pipe_ch_pcg', 'pipe_ch_pcg_b']:
+    for method in ['hs_pcg', 'gv_pcg', 'pipe_ch_pcg', 'pipe_pr_ch_pcg']:
         trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
         add_plot(trial,ax3)
         
@@ -336,13 +335,12 @@ matrices += [
     ['s3rmt3m3',250000,None],
 ]
 
-
 #%%
 # NOW RUN TESTS
 
 for matrix_name,max_iter,preconditioner in matrices:
     print(f'matrix: {matrix_name}, preconditioner: {preconditioner}')
-    
+
 #    A = sp.sparse.csr_matrix(sp.io.mmread(f"../matrices/{matrix_name}.mtx"))
 #    test_matrix(A,max_iter,matrix_name,preconditioner)
     

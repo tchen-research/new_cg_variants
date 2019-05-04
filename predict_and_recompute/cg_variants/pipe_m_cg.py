@@ -17,7 +17,7 @@ def pipe_m_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
     
     # initialize
     output = {}
-    output['name'] = f"pipe_m_cg{'_'+variant if variant!= '' else''}"
+    output['name'] = f"pipe{'_'+variant if variant!= '' else''}_m_cg"
     output['max_iter'] = max_iter
     
     x_k    =  np.copy(x0)
@@ -67,7 +67,7 @@ def pipe_m_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
         p_k    =  r_k   +   b_k * p_k1
         s_k    =  w_k   +   b_k * s_k1
         u_k    =  A     @ s_k
-        w_k    =  A     @ r_k if variant == 'b' else w_k
+        w_k    =  A     @ r_k if variant == 'pr' else w_k
         mu_k   =  p_k   @ s_k
         gam_k  =  s_k   @ s_k
         nu_k   =  r_k   @ r_k 
@@ -79,8 +79,8 @@ def pipe_m_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
             
     return output
 
-def pipe_m_cg_b(*args,**kwargs):
-    return pipe_m_cg(*args,variant='b',**kwargs)
+def pipe_pr_m_cg(*args,**kwargs):
+    return pipe_m_cg(*args,variant='pr',**kwargs)
 
 
 def pipe_m_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[],**kwargs):
@@ -94,7 +94,7 @@ def pipe_m_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[]
     
     # initialize
     output = {}
-    output['name'] = f"pipe_m_pcg{'_'+variant if variant!= '' else''}"
+    output['name'] = f"pipe{'_'+variant if variant!= '' else''}_m_pcg"
     output['max_iter'] = max_iter
     
     x_k    =  np.copy(x0)
@@ -154,8 +154,8 @@ def pipe_m_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[]
         st_k   =  wt_k  +   b_k * st_k1
         u_k    =  A     @ st_k 
         ut_k   =  preconditioner(u_k)
-        w_k    =  A     @ rt_k if variant == 'b' else w_k
-        wt_k   =  preconditioner(w_k) if variant == 'b' else wt_k
+        w_k    =  A     @ rt_k if variant == 'pr' else w_k
+        wt_k   =  preconditioner(w_k) if variant == 'pr' else wt_k
         mu_k   =  p_k   @ s_k
         gam_k  =  st_k  @ s_k 
         nu_k   =  rt_k  @ r_k
@@ -168,6 +168,6 @@ def pipe_m_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[]
             
     return output
 
-def pipe_m_pcg_b(*args,**kwargs):
-    return pipe_m_pcg(*args,variant='b',**kwargs)
+def pipe_pr_m_pcg(*args,**kwargs):
+    return pipe_m_pcg(*args,variant='pr',**kwargs)
 

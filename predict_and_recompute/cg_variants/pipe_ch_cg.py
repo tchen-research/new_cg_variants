@@ -17,7 +17,7 @@ def pipe_ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
     
     # initialize
     output = {}
-    output['name'] = f"pipe_ch_cg{'_'+variant if variant!= '' else''}"
+    output['name'] = f"pipe{'_'+variant if variant!= '' else''}_ch_cg"
     output['max_iter'] = max_iter
     
     x_k    =  np.copy(x0)
@@ -67,7 +67,7 @@ def pipe_ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
         p_k    =  r_k   +   b_k * p_k1
         s_k    =  w_k   +   b_k * s_k1
         u_k    =  A     @ s_k
-        w_k    =  A     @ r_k if variant == 'b' else w_k
+        w_k    =  A     @ r_k if variant == 'pr' else w_k
         mu_k   =  p_k   @ s_k
         del_k  =  r_k   @ s_k
         gam_k  =  s_k   @ s_k
@@ -80,8 +80,8 @@ def pipe_ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
             
     return output
 
-def pipe_ch_cg_b(*args,**kwargs):
-    return pipe_ch_cg(*args,variant='b',**kwargs)
+def pipe_pr_ch_cg(*args,**kwargs):
+    return pipe_ch_cg(*args,variant='pr',**kwargs)
 
 
 def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[],**kwargs):
@@ -95,7 +95,7 @@ def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[
     
     # initialize
     output = {}
-    output['name'] = f"pipe_ch_pcg{'_'+variant if variant!= '' else''}"
+    output['name'] = f"pipe{'_'+variant if variant!= '' else''}_ch_pcg"
     output['max_iter'] = max_iter
     
     x_k    =  np.copy(x0)
@@ -157,8 +157,8 @@ def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[
         st_k   =  wt_k  +   b_k * st_k1
         u_k    =  A     @ st_k 
         ut_k   =  preconditioner(u_k)
-        w_k    =  A     @ rt_k if variant == 'b' else w_k
-        wt_k   =  preconditioner(w_k) if variant == 'b' else wt_k
+        w_k    =  A     @ rt_k if variant == 'pr' else w_k
+        wt_k   =  preconditioner(w_k) if variant == 'pr' else wt_k
         mu_k   =  p_k   @ s_k
         del_k  =  r_k   @ st_k # or rt_k @ s_k or p_k @ s_k
         gam_k  =  st_k  @ s_k 
@@ -172,5 +172,5 @@ def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[
             
     return output
 
-def pipe_ch_pcg_b(*args,**kwargs):
-    return pipe_ch_pcg(*args,variant='b',**kwargs)
+def pipe_pr_ch_pcg(*args,**kwargs):
+    return pipe_ch_pcg(*args,variant='pr',**kwargs)
