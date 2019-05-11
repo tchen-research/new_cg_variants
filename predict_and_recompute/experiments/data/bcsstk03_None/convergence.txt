@@ -1,1 +1,0 @@
-{\tt bcsstk03 } & - & 112 & 640& {364}& \tableemph{439}& \tableemph{425}& {380}& \tableemph{598}& \tableemph{968}& \tableemph{669}& \tableemph{492}& \tableemph{411}&{-14.55}&{-14.49}&{-14.40}&{-14.43}&\tableemph{-6.86}&\tableemph{-5.55}&\tableemph{-7.13}&\tableemph{-12.65}&\tableemph{-12.96}\\ 
