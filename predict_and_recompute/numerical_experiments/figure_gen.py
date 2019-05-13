@@ -153,11 +153,11 @@ def variant_offset(name,spacing):
     if name[:3] == 'hs_':
         return 0
     elif name[:3] == 'cg_':
-        return spacing/3
+        return spacing/4
     elif name[:2] == 'm_':
-        return 2*spacing/3
+        return 2*spacing/4
     elif name[:3] == 'gv_':
-        return spacing/2
+        return 3*spacing/4
     
     return 0
 
