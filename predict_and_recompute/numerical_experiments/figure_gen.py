@@ -125,12 +125,14 @@ def gen_convergence_table():
 
 #%%
 def variant_name(name):
-    
+    if name == 'pipe_pr_ch_pcg':
+        return "\\textsc{{p-PR-CG}}"
+
     formatted_name = name.upper().replace('PCG','CG').replace('_','-')
 
     variant = ''
     
-    formatted_name = formatted_name.replace('PR','pr')
+    formatted_name = formatted_name.replace('PR','PR')
     formatted_name = formatted_name.replace('PIPE','p')
     
     return f"\\textsc{{{formatted_name}}}"

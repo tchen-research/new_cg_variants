@@ -9,7 +9,7 @@ This folder contains materials to help reproduce the results of:
         Year = {2019}
     }
 
-An extended introduction to this paper can be found [here](http://chen.pw/research/publications/chen_19.html).
+An extended introduction to this paper can be found [here](https://chen.pw/research/publications/predict_and_recompute.html).
 
 ![sample-convergence](numerical_experiments/figures/model_48_8_3-bcsstk03-s3rmq4m1_None-None-jacobi_error_A_norm.svg)
 
