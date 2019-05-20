@@ -87,97 +87,57 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
   
   ierr = PCGetOperators(ksp->pc,&Amat,&Pmat);CHKERRQ(ierr);
 
+  /* initialize */
   ksp->its = 0;
   if (!ksp->guess_zero) {
-    ierr = KSP_MatMult(ksp,Amat,X,R);CHKERRQ(ierr);            /*     r <- b - Ax     */
+    ierr = KSP_MatMult(ksp,Amat,X,R);CHKERRQ(ierr);  /*   r <- b - Ax  */
     ierr = VecAYPX(R,-1.0,B);CHKERRQ(ierr);
   } else {
-    ierr = VecCopy(B,R);CHKERRQ(ierr);                         /*     r <- b (x is 0) */
+    ierr = VecCopy(B,R);CHKERRQ(ierr);               /*   r <- b       */
   }
-
-  ierr = KSP_PCApply(ksp,R,RT);CHKERRQ(ierr);                   /*     rt <- Br   */
-
-  switch (ksp->normtype) {
-  case KSP_NORM_PRECONDITIONED:
-    ierr = VecNormBegin(RT,NORM_2,&dp);CHKERRQ(ierr);                /*     dp <- (rt', rt)     */
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)RT));CHKERRQ(ierr);
-    ierr = VecNormEnd(RT,NORM_2,&dp);CHKERRQ(ierr);
-    break;
-  case KSP_NORM_UNPRECONDITIONED:
-    ierr = VecNormBegin(R,NORM_2,&dp);CHKERRQ(ierr);                /*     dp <- r'*r = e'*A'*A*e            */
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
-    ierr = VecNormEnd(R,NORM_2,&dp);CHKERRQ(ierr);
-    break;
-  case KSP_NORM_NATURAL:
-    ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);                  /*     nu <- (rt', r)       */
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
-    ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);
-    KSPCheckDot(ksp,nu);
-    dp = PetscSqrtReal(PetscAbsScalar(nu));                  /*     dp <- (r',rt) = (r',B rt)  */
-    break;
-  case KSP_NORM_NONE:
-    ierr = KSP_MatMult(ksp,Amat,RT,W);CHKERRQ(ierr);
-    dp   = 0.0;
-    break;
-  default: SETERRQ1(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"%s",KSPNormTypes[ksp->normtype]);
-  }
-  ierr       = KSPLogResidualHistory(ksp,dp);CHKERRQ(ierr);
-  ierr       = KSPMonitor(ksp,0,dp);CHKERRQ(ierr);
-  ksp->rnorm = dp;
-  ierr       = (*ksp->converged)(ksp,0,dp,&ksp->reason,ksp->cnvP);CHKERRQ(ierr); /* test for convergence */
-  if (ksp->reason) PetscFunctionReturn(0);
-
-  /* initialize */
   
-  ierr = KSP_MatMult(ksp,Amat,RT,W);CHKERRQ(ierr);              /*     w <- A rt  */
-  ierr = KSP_PCApply(ksp,W,WT);CHKERRQ(ierr);           /*   wt <- B w       */
+  ierr = KSP_PCApply(ksp,R,RT);CHKERRQ(ierr);        /*   rt <- Br     */
+  ierr = KSP_MatMult(ksp,Amat,RT,W);CHKERRQ(ierr);   /*   w <- A rt    */
+  ierr = KSP_PCApply(ksp,W,WT);CHKERRQ(ierr);        /*   wt <- B w    */
   
-  ierr = VecCopy(RT,P);CHKERRQ(ierr);        /*     p <- rt          */
-  ierr = VecCopy(W,S);CHKERRQ(ierr);        /*     p <- rt          */
-  ierr = VecCopy(WT,ST);CHKERRQ(ierr);        /*     p <- rt          */
+  ierr = VecCopy(RT,P);CHKERRQ(ierr);                /*   p <- rt      */
+  ierr = VecCopy(W,S);CHKERRQ(ierr);                 /*   p <- rt      */
+  ierr = VecCopy(WT,ST);CHKERRQ(ierr);               /*   p <- rt      */
   
-  ierr = KSP_MatMult(ksp,Amat,ST,U);CHKERRQ(ierr);      /*   u <- Ast       */
-  ierr = KSP_PCApply(ksp,U,UT);CHKERRQ(ierr);           /*   ut <- Bu       */
+  ierr = KSP_MatMult(ksp,Amat,ST,U);CHKERRQ(ierr);   /*   u <- Ast     */
+  ierr = KSP_PCApply(ksp,U,UT);CHKERRQ(ierr);        /*   ut <- Bu     */
   
   ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);
   ierr = VecDotBegin(P,S,&mu);CHKERRQ(ierr);
   ierr = VecDotBegin(ST,S,&gamma);CHKERRQ(ierr);
   
-  ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);
-  ierr = VecDotEnd(P,S,&mu);CHKERRQ(ierr);
-  ierr = VecDotEnd(ST,S,&gamma);CHKERRQ(ierr);
-  
+  ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);          /*   nu    <- (rt,r)  */
+  ierr = VecDotEnd(P,S,&mu);CHKERRQ(ierr);           /*   mu    <- (p,s)   */
+  ierr = VecDotEnd(ST,S,&gamma);CHKERRQ(ierr);       /*   gamma <- (st,s)  */
   delta = mu;
-  
+ 
   i = 0;
   do {
-    /* this is kind of a mess ....*/
 
-   if (ksp->normtype == KSP_NORM_UNPRECONDITIONED) {
-    //  printf("norm_unprec");
-      ierr = VecNormBegin(R,NORM_2,&dp);CHKERRQ(ierr);
-    } else if (ksp->normtype == KSP_NORM_PRECONDITIONED) {
-    //  printf("norm_prec");
-      ierr = VecNormBegin(RT,NORM_2,&dp);CHKERRQ(ierr);
-    }
-    if (!(i == 0 && ksp->normtype == KSP_NORM_NATURAL)) {
-//      ierr = VecDotBegin(R,RT,&gamma);CHKERRQ(ierr);
-    }
-
-    if (ksp->normtype == KSP_NORM_UNPRECONDITIONED) {
-      ierr = VecNormEnd(R,NORM_2,&dp);CHKERRQ(ierr);
-    } else if (ksp->normtype == KSP_NORM_PRECONDITIONED) {
-      ierr = VecNormEnd(RT,NORM_2,&dp);CHKERRQ(ierr);
-    }
-    if (!(i == 0 && ksp->normtype == KSP_NORM_NATURAL)) {
- //     ierr = VecDotEnd(R,RT,&gamma);CHKERRQ(ierr);
-    }
-
-    if (ksp->normtype == KSP_NORM_NATURAL) {
+   /* Compute appropriate norm */  
+   switch (ksp->normtype) {
+     case KSP_NORM_PRECONDITIONED:
+        ierr = VecNormBegin(RT,NORM_2,&dp);CHKERRQ(ierr);
+        ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)RT));CHKERRQ(ierr);
+        ierr = VecNormEnd(RT,NORM_2,&dp);CHKERRQ(ierr);
+        break;
+    case KSP_NORM_UNPRECONDITIONED:
+        ierr = VecNormBegin(R,NORM_2,&dp);CHKERRQ(ierr);
+        ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
+        ierr = VecNormEnd(R,NORM_2,&dp);CHKERRQ(ierr);
+        break;
+    case KSP_NORM_NATURAL:
         dp = PetscSqrtReal(PetscAbsScalar(nu));
-    }
-    else if (ksp->normtype == KSP_NORM_NONE){
-        dp = 0.0;
+        break;
+    case KSP_NORM_NONE:
+        dp   = 0.0;
+        break;
+    default: SETERRQ1(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"%s",KSPNormTypes[ksp->normtype]);
     }
 
     ksp->rnorm = dp;
@@ -210,8 +170,8 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
     ierr = VecMDotBegin(S,3,PRTST,mudelgam);CHKERRQ(ierr);
 
     // What is the meaning of this, and what is the meaning of S?
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)S));CHKERRQ(ierr);
-//    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
+ //   ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)S));CHKERRQ(ierr);
+    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
 
     ierr = KSP_MatMult(ksp,Amat,ST,U);CHKERRQ(ierr);  /*   u  <- A st             */
 
@@ -259,7 +219,7 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
    Tyler Chen, University of Washington, Applied Mathematics Department
 
    Reference:
-   "New communication avoiding conjugate gradient variants". Tyler Chen. In preparation.
+   "Pipelined predict-and-recompute conjugate gradient variants". Tyler Chen. In preparation.
 
    Acknowledgments:
    This material is based upon work supported by the National Science Foundation Graduate Research Fellowship Program under Grant No. DGE-1762114. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author and do not necessarily reflect the views of the National Science Foundation.

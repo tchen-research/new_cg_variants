@@ -13,7 +13,7 @@ static PetscErrorCode KSPSetUp_HSCG(KSP ksp)
 
   PetscFunctionBegin;
   /* get work vectors needed by HSCG */
-  ierr = KSPSetWorkVecs(ksp,9);CHKERRQ(ierr);
+  ierr = KSPSetWorkVecs(ksp,4);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -46,88 +46,50 @@ static PetscErrorCode  KSPSolve_HSCG(KSP ksp)
   S  = ksp->work[3];
 
   ierr = PCGetOperators(ksp->pc,&Amat,&Pmat);CHKERRQ(ierr);
-
+  
+  /* initialize */
   ksp->its = 0;
   if (!ksp->guess_zero) {
-    ierr = KSP_MatMult(ksp,Amat,X,R);CHKERRQ(ierr);            /*     r <- b - Ax     */
+    ierr = KSP_MatMult(ksp,Amat,X,R);CHKERRQ(ierr);  /*   r <- b - Ax  */
     ierr = VecAYPX(R,-1.0,B);CHKERRQ(ierr);
   } else {
-    ierr = VecCopy(B,R);CHKERRQ(ierr);                         /*     r <- b (x is 0) */
+    ierr = VecCopy(B,R);CHKERRQ(ierr);               /*   r <- b       */
   }
-
-  ierr = KSP_PCApply(ksp,R,RT);CHKERRQ(ierr);                   /*     u <- Br   */
-
-  switch (ksp->normtype) {
-  case KSP_NORM_PRECONDITIONED:
-    ierr = VecNormBegin(RT,NORM_2,&dp);CHKERRQ(ierr);                /*     dp <- u'*u = e'*A'*B'*B*A'*e'     */
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)RT));CHKERRQ(ierr);
-    ierr = VecNormEnd(RT,NORM_2,&dp);CHKERRQ(ierr);
-    break;
-  case KSP_NORM_UNPRECONDITIONED:
-    ierr = VecNormBegin(R,NORM_2,&dp);CHKERRQ(ierr);                /*     dp <- r'*r = e'*A'*A*e            */
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
-    ierr = VecNormEnd(R,NORM_2,&dp);CHKERRQ(ierr);
-    break;
-  case KSP_NORM_NATURAL:
-    ierr = VecDotBegin(R,RT,&nu);CHKERRQ(ierr);                  /*     gamma <- u'*r       */
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
-    ierr = VecDotEnd(R,RT,&nu);CHKERRQ(ierr);
-    KSPCheckDot(ksp,nu);
-    dp = PetscSqrtReal(PetscAbsScalar(nu));                  /*     dp <- r'*u = r'*B*r = e'*A'*B*A*e */
-    break;
-  case KSP_NORM_NONE:
-    dp   = 0.0;
-    break;
-  default: SETERRQ1(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"%s",KSPNormTypes[ksp->normtype]);
-  }
-  ierr       = KSPLogResidualHistory(ksp,dp);CHKERRQ(ierr);
-  ierr       = KSPMonitor(ksp,0,dp);CHKERRQ(ierr);
-  ksp->rnorm = dp;
-  ierr       = (*ksp->converged)(ksp,0,dp,&ksp->reason,ksp->cnvP);CHKERRQ(ierr); /* test for convergence */
-  if (ksp->reason) PetscFunctionReturn(0);
-
-
-  /* initialize */
   
+  ierr = KSP_PCApply(ksp,R,RT);CHKERRQ(ierr);        /*   rt <- Br     */
   
-  ierr = VecCopy(RT,P);CHKERRQ(ierr);        /*     p <- rt          */
-  
-
-  ierr = KSP_MatMult(ksp,Amat,P,S);CHKERRQ(ierr);      /*   s <- A p       */
+  ierr = VecCopy(RT,P);CHKERRQ(ierr);                /*   p <- rt      */
+  ierr = KSP_MatMult(ksp,Amat,P,S);CHKERRQ(ierr);    /*   s <- A p     */
   
   ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);
   ierr = VecDotBegin(P,S,&mu);CHKERRQ(ierr);
   
-  ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);
-  ierr = VecDotEnd(P,S,&mu);CHKERRQ(ierr);
+  ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);          /*   nu    <- (rt,r)  */
+  ierr = VecDotEnd(P,S,&mu);CHKERRQ(ierr);           /*   mu    <- (p,s)   */
+ 
 
   i = 0;
   do {
-    /* this is kind of a mess ....*/
 
-    if (ksp->normtype == KSP_NORM_UNPRECONDITIONED) {
-      ierr = VecNormBegin(R,NORM_2,&dp);CHKERRQ(ierr);
-    } else if (ksp->normtype == KSP_NORM_PRECONDITIONED) {
-      ierr = VecNormBegin(RT,NORM_2,&dp);CHKERRQ(ierr);
-    }
-    if (!(i == 0 && ksp->normtype == KSP_NORM_NATURAL)) {
-//      ierr = VecDotBegin(R,RT,&gamma);CHKERRQ(ierr);
-    }
-
-    if (ksp->normtype == KSP_NORM_UNPRECONDITIONED) {
-      ierr = VecNormEnd(R,NORM_2,&dp);CHKERRQ(ierr);
-    } else if (ksp->normtype == KSP_NORM_PRECONDITIONED) {
-      ierr = VecNormEnd(RT,NORM_2,&dp);CHKERRQ(ierr);
-    }
-    if (!(i == 0 && ksp->normtype == KSP_NORM_NATURAL)) {
- //     ierr = VecDotEnd(R,RT,&gamma);CHKERRQ(ierr);
-    }
-
-    if (ksp->normtype == KSP_NORM_NATURAL) {
+   /* Compute appropriate norm */  
+   switch (ksp->normtype) {
+     case KSP_NORM_PRECONDITIONED:
+        ierr = VecNormBegin(RT,NORM_2,&dp);CHKERRQ(ierr);
+        ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)RT));CHKERRQ(ierr);
+        ierr = VecNormEnd(RT,NORM_2,&dp);CHKERRQ(ierr);
+        break;
+    case KSP_NORM_UNPRECONDITIONED:
+        ierr = VecNormBegin(R,NORM_2,&dp);CHKERRQ(ierr);
+        ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
+        ierr = VecNormEnd(R,NORM_2,&dp);CHKERRQ(ierr);
+        break;
+    case KSP_NORM_NATURAL:
         dp = PetscSqrtReal(PetscAbsScalar(nu));
-    }
-    else if (ksp->normtype == KSP_NORM_NONE){
-        dp = 0.0;
+        break;
+    case KSP_NORM_NONE:
+        dp   = 0.0;
+        break;
+    default: SETERRQ1(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"%s",KSPNormTypes[ksp->normtype]);
     }
 
     ksp->rnorm = dp;
@@ -136,14 +98,13 @@ static PetscErrorCode  KSPSolve_HSCG(KSP ksp)
     ierr = (*ksp->converged)(ksp,i,dp,&ksp->reason,ksp->cnvP);CHKERRQ(ierr);
     if (ksp->reason) break;
 
-
     alpha = nu/mu;
     nu_old = nu;
 
-    ierr = VecAXPY(X, alpha,P);CHKERRQ(ierr); /*     x <- x + alpha * p   */
-    ierr = VecAXPY(R,-alpha,S);CHKERRQ(ierr); /*     r <- r - alpha * s   */
+    ierr = VecAXPY(X, alpha,P);CHKERRQ(ierr);              /* x <- x + alpha * p   */
+    ierr = VecAXPY(R,-alpha,S);CHKERRQ(ierr);              /* r <- r - alpha * s   */
     
-    ierr = KSP_PCApply(ksp,R,RT);CHKERRQ(ierr);           /*   rt <- B r       */
+    ierr = KSP_PCApply(ksp,R,RT);CHKERRQ(ierr);            /*  rt <- B r       */
 
     ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);
     ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
@@ -151,9 +112,9 @@ static PetscErrorCode  KSPSolve_HSCG(KSP ksp)
 
     beta = nu/nu_old;
  
-    ierr = VecAYPX(P,beta,RT);CHKERRQ(ierr); /*     p <- rt + beta * p   */
+    ierr = VecAYPX(P,beta,RT);CHKERRQ(ierr);               /* p <- rt + beta * p   */
     
-    ierr = KSP_MatMult(ksp,Amat,P,S);CHKERRQ(ierr);      /*   s <- A p       */
+    ierr = KSP_MatMult(ksp,Amat,P,S);CHKERRQ(ierr);        /* s <- A p       */
 
     ierr = VecDotBegin(P,S,&mu);CHKERRQ(ierr);
     ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)P));CHKERRQ(ierr);
@@ -163,13 +124,6 @@ static PetscErrorCode  KSPSolve_HSCG(KSP ksp)
     i++;
     ksp->its = i;
 
-    /* if (i%50 == 0) { */
-    /*   ierr = KSP_MatMult(ksp,Amat,X,R);CHKERRQ(ierr);            /\*     w <- b - Ax     *\/ */
-    /*   ierr = VecAYPX(R,-1.0,B);CHKERRQ(ierr); */
-    /*   ierr = KSP_PCApply(ksp,R,U);CHKERRQ(ierr); */
-    /*   ierr = KSP_MatMult(ksp,Amat,U,W);CHKERRQ(ierr); */
-    /* } */
-
   } while (i<ksp->max_it);
   if (i >= ksp->max_it) ksp->reason = KSP_DIVERGED_ITS;
   PetscFunctionReturn(0);
@@ -177,25 +131,13 @@ static PetscErrorCode  KSPSolve_HSCG(KSP ksp)
 
 
 /*MC
-   KSPHSCG - Pipelined conjugate gradient method.
-
-   This method has only a single non-blocking reduction per iteration, compared to 2 blocking for standard CG.  The
-   non-blocking reduction is overlapped by the matrix-vector product and preconditioner application.
-
-   See also KSPPIPECR, where the reduction is only overlapped with the matrix-vector product.
-
-   Level: intermediate
+   KSPHSCG - conjugate gradient method.
 
    Notes:
-   MPI configuration may be necessary for reductions to make asynchronous progress, which is important for performance of pipelined methods.
-   See the FAQ on the PETSc website for details.
 
    Contributed by:
-   Pieter Ghysels, Universiteit Antwerpen, Intel Exascience lab Flanders
 
    Reference:
-   P. Ghysels and W. Vanroose, "Hiding global synchronization latency in the preconditioned Conjugate Gradient algorithm",
-   Submitted to Parallel Computing, 2012.
 
 .seealso: KSPCreate(), KSPSetType(), KSPPIPECR, KSPGROPPCG, KSPPGMRES, KSPCG, KSPCGUseSingleReduction()
 M*/

@@ -28,7 +28,7 @@ static PetscErrorCode KSPSetUp_CHCG(KSP ksp)
 static PetscErrorCode  KSPSolve_CHCG(KSP ksp)
 {
   PetscErrorCode ierr;
-  PetscInt       i, rcq = 1;
+  PetscInt       i;
   PetscScalar    alpha = 0.0, beta = 0.0, mu = 0.0, delta = 0.0, gamma = 0.0, nu = 0.0, nu_old = 0.0;
   PetscReal      dp    = 0.0;
   Vec            X,B,R,RT,P,S,ST;
@@ -116,21 +116,25 @@ static PetscErrorCode  KSPSolve_CHCG(KSP ksp)
     ierr = VecAXPY(RT,-alpha,ST);CHKERRQ(ierr);       /*   rt <- rt - alpha * st  */
     ierr = VecAYPX(P,beta,RT);CHKERRQ(ierr);          /*   p  <- rt + beta  * p   */
 
+    
+    
+    
     ierr = KSP_MatMult(ksp,Amat,P,S);CHKERRQ(ierr);   /*   s  <- A p              */
     ierr = KSP_PCApply(ksp,S,ST);CHKERRQ(ierr);       /*   st <- B s              */
  
     /* start inner products and matrix products */
+    ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);
     ierr = VecDotBegin(P,S,&mu);CHKERRQ(ierr);    
     ierr = VecDotBegin(RT,S,&delta);CHKERRQ(ierr);
     ierr = VecDotBegin(ST,S,&gamma);CHKERRQ(ierr);
-    ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);
 
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)S));CHKERRQ(ierr);
-
+  //  ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)S));CHKERRQ(ierr);
+    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
+    
+    ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);         /*   nu    <- (p,s)         */
     ierr = VecDotEnd(P,S,&mu);CHKERRQ(ierr);          /*   mu    <- (p,s)         */
     ierr = VecDotEnd(RT,S,&delta);CHKERRQ(ierr);      /*   delta <- (p,s)         */
     ierr = VecDotEnd(ST,S,&gamma);CHKERRQ(ierr);      /*   gamma <- (p,s)         */
-    ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);         /*   nu    <- (p,s)         */
 
 
     i++;
@@ -143,10 +147,9 @@ static PetscErrorCode  KSPSolve_CHCG(KSP ksp)
 
 
 /*MC
-   KSPCHCG - Pipelined predict-and-recompute conjugate gradient method.
+   KSPCHCG - Communication hiding conjugate gradient method.
 
-   This method has only a single non-blocking reduction per iteration, compared to 2 blocking for standard CG.  The
-   non-blocking reduction is overlapped by the matrix-vector product and preconditioner application.
+   This method has only a single non-blocking reduction per iteration, compared to 2 blocking for standard CG. 
 
    Level: intermediate
 
@@ -158,12 +161,12 @@ static PetscErrorCode  KSPSolve_CHCG(KSP ksp)
    Tyler Chen, University of Washington, Applied Mathematics Department
 
    Reference:
-   "New communication avoiding conjugate gradient variants". Tyler Chen. In preparation.
+   "Pipelined predict-and-recompute conjugate gradient variants". Tyler Chen. In preparation.
 
    Acknowledgments:
    This material is based upon work supported by the National Science Foundation Graduate Research Fellowship Program under Grant No. DGE-1762114. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author and do not necessarily reflect the views of the National Science Foundation.
 
-.seealso: KSPCreate(), KSPSetType(), KSPPIPECG, KSPPIPECR, KSPGROPPCG, KSPPGMRES, KSPCG, KSPCGUseSingleReduction()
+.seealso: KSPCreate(), KSPSetType(), KSPPIPEPRCG, KSPPIPECG, KSPPIPECR, KSPGROPPCG, KSPPGMRES, KSPCG, KSPCGUseSingleReduction()
 M*/
 PETSC_EXTERN PetscErrorCode KSPCreate_CHCG(KSP ksp)
 {

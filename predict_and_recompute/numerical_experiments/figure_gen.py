@@ -125,15 +125,17 @@ def gen_convergence_table():
 
 #%%
 def variant_name(name):
-    if name == 'pipe_pr_ch_pcg':
-        return "\\textsc{{p-PR-CG}}"
-
+    if name == 'ch_pcg':
+        return "\\textsc{{PR-CG}}"
+    elif name == 'pipe_pr_ch_pcg':
+        return "\\textsc{{PPR-CG}}"
+    elif name == 'pipe_pr_m_pcg':
+        return "\\textsc{{PPR-M-CG}}"
+    elif name == 'pipe_m_pcg':
+        return "\\textsc{{P-M-CG}}"
+    elif name == 'pipe_ch_pcg':
+        return "\\textsc{{PP-CG}}"
     formatted_name = name.upper().replace('PCG','CG').replace('_','-')
-
-    variant = ''
-    
-    formatted_name = formatted_name.replace('PR','PR')
-    formatted_name = formatted_name.replace('PIPE','p')
     
     return f"\\textsc{{{formatted_name}}}"
 
@@ -354,6 +356,7 @@ def plot_matrices_test(titles,preconditioners,quantity='error_A_norm'):
     
     plt.subplots_adjust(wspace=.05, hspace=0)
     plt.savefig(f"figures/{'-'.join(titles)}_{'-'.join([str(pc) for pc in preconditioners])}_{quantity}.pdf",bbox_inches='tight')
+    plt.savefig(f"figures/{'-'.join(titles)}_{'-'.join([str(pc) for pc in preconditioners])}_{quantity}.svg",bbox_inches='tight')
     plt.close()
 
 
@@ -459,7 +462,7 @@ matrices += [
 
 #%%
 # NOW RUN TESTS AND GENERATE FIGURES
-"""
+
 for matrix_name,max_iter,preconditioner in matrices:
     print(f'matrix: {matrix_name}, preconditioner: {preconditioner}')
 
@@ -473,7 +476,7 @@ for matrix_name,max_iter,preconditioner in matrices:
     plot_matrix_test(matrix_name,preconditioner,'residual_2_norm',methods=methods)
 
 gen_convergence_table()
-"""
+
 #%%
 # GENERATE GROUPED PLOTS
 plot_matrices_test(['model_48_8_3','bcsstk03','s3rmq4m1'],[None,None,'jacobi'],quantity='error_A_norm')

@@ -2,104 +2,170 @@ import numpy as np
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 
-n_nodes = 40
-n_cores = 16
-mesh_pts = 1000
+# set scaling experiment parameters
+n_cores = 28
+max_iter = 4000
+mesh_pts = 2048
 
-num_repeats = 5
-skip = n_nodes // 10
-core_list = [0]+list(range(skip-1,n_nodes,skip))
+variants = ['cg','chcg','pipecg','pipeprcg_0','pipeprcg']
+node_list = list(range(1,16))
+node_list = [1,2,3,4,5,6,7,8,10,12,14,16,18]
 
-time_components = ['MatMult','PCApply','VecAXPY','VecAYPX','VecTDot','VecNorm','VecReduceArith','VecReduceComm','VecReduceEnd','VecReduceBegin','self']
-## what is self???
 
-variants = ['hscg','pipecg','pipeprcg','pipeprcg_0']
 
+node_list.sort()
+print(node_list)
+
+
+# maximum number of trials
+max_trials = 35
 
 # parse scaling test data
 for variant in variants:
     data = {}
-    for component in time_components:
-        data[component] = np.zeros(len(core_list))
-    times = np.inf*np.ones(len(core_list))
-    mflops = np.inf*np.ones(len(core_list))
+    times = np.empty((len(node_list),max_trials))
+    times[:] = np.nan
 
-    for k,n in enumerate(core_list):
-        # instead should find trial with min time, and then generate percents from that..
-        for repeat in range(num_repeats):
+    # loop over number of nodes
+    for k,n in enumerate(node_list):
+        # now loop over trails
+        for trial_number in range(max_trials):
+            # if the trial exists, parse the runtime (note there is a slight overhead for setting up the KSP, but we run enough iterations that this is relatively small)
             try:
-                tree = ET.parse(f'./logs/{variant}/{mesh_pts}_{(n+1):02d}_trial{repeat:02d}.xml')
+                tree = ET.parse(f'./logs/{variant}/{mesh_pts}/{n:02d}/{trial_number:02d}.xml')
                 root = tree.getroot()
                 globalperformance = root[0].find('globalperformance')        
                 
-                repeat_time = float(globalperformance.find('time').find('max').text)
-
-                # if this trial has a better time
-                if repeat_time < times[k] :
-                    times[k] = repeat_time
-    
-                    # get runtimes times
-                    mflops[k] = float(globalperformance.find('mflops').find('average').text)
-
-                    # get event breakdowns
-                    events = root[0].find('timertree').find('event').find('events')
-                
-                    for event in events:
-                        event_name = event[0].text
-                        if event_name in time_components:
-                            data[event_name][k] = float(event[1][0].text)
- 
+                times[k,trial_number] = float(globalperformance.find('time').find('average').text)
+  
             except:
                 pass
-        
-    print(times)
+    
     data['times'] = times
-    data['mflops'] = mflops
-
     np.save(f'data/{variant}_strong_scale',data,allow_pickle=True)
 
+# now load data
 data = {}
 for variant in variants:
     data[variant] = np.load(f'data/{variant}_strong_scale.npy',allow_pickle=True).item()
 
-# scaling times
-t0 = data[variants[0]]['times'][0]
-fig, (ax1,ax2) = plt.subplots(1,2,figsize=(8,3))
+# define some helper functions to get formatting information for plotting
+def variant_name(name):
+    
+    formatted_name = name.upper() 
+    if name == 'hscg':
+        formatted_name = 'HS-CG'
+    elif name == 'chcg':
+        formatted_name = 'PR-CG'
+    elif name == 'pipecg':
+        formatted_name = 'GV-CG'
+    elif name == 'pipeprcg':
+        formatted_name = 'PPR-CG$^*$'
+    elif name == 'pipeprcg_0':
+        formatted_name = 'PP-CG'
+
+    return f"\\textsc{{{formatted_name}}}"
+
+def variant_marker(name):
+    
+    if name == 'cg':
+        return 'o'
+    elif name == 'pipecg':
+        return 's'
+    
+    return '.'
+
+def variant_line_style(name):
+    
+    if name == 'chcg':
+        return ':'
+    elif name == 'pipeprcg_0':
+        return '--'
+    elif name == 'pipeprcg':
+        return '-'
+
+    return '-'
+
+def variant_color(name):
+    
+    # if one of default variants
+    for string in ['cg','hscg','pipecg']:
+        if name == string:
+            return '#93a1a1'
+    return '#073642'
+
+def grey_out(color):
+    new_color = '#'
+    
+    r,g,b = (int(color[i:i+2],16) for i in [1,3,5])
+    
+    f = 0.5
+    L = 0.3* + 0.6*g + 0.1*b
+
+    for c in (r,g,b):
+        new_color += hex(min(int( (c + f * (L - c)) ),255))[2:].zfill(2)
+
+    return new_color
+
+def lighten(color):
+    new_color = '#'
+    
+    r,g,b = (int(color[i:i+2],16) for i in [1,3,5])
+ 
+    scale = .6
+
+    for c in (r,g,b):
+        new_color += hex(min(int( c + (255-c)*scale ),255))[2:].zfill(2)
+
+    return new_color
+
+   
+
+
+# plot scaling times
+t0 = np.nanmin(data[variants[0]]['times'][0])
+fig, (ax1,ax2) = plt.subplots(1,2,figsize=(14,4))
+
 for variant in variants:
-    times = data[variant]['times']
-    ax1.plot(core_list,times,linestyle=':',marker='o',label=variant)
-    ax2.plot(core_list,t0/times,linestyle=':',marker='o',label=variant)
+    
+    # get minimum runtime for each variant and node
+    times = np.nanmin(data[variant]['times'],axis=1)
 
-fig.suptitle(f'strong scaling experiment n={mesh_pts}')
-ax1.set_yscale('log')
-ax1.legend()
-ax2.legend()
-plt.savefig('figures/strong_scale.pdf')
+    # get style parameters
+    lbl = variant_name(variant)
+    ms = variant_marker(variant)
+    ls = variant_line_style(variant)
+    cl = variant_color(variant)
 
-# mflops scaling
-plt.figure()
-for variant in variants:
-    mflops = data[variant]['mflops']
-    plt.plot(core_list,mflops,linestyle=':',marker='o',label=variant)
+   
+    ax1.plot(node_list,times,linestyle=ls,marker=ms,label=lbl,color=cl,markevery=1)
+    ax2.plot(node_list,times[0]/times,linestyle=ls,marker=ms,color=cl,markevery=1)
 
-plt.legend()
-plt.title(f'strong scaling experiment n={mesh_pts}')
-plt.savefig('figures/mflops_strong_scale.pdf')
+print(np.nanmin(data[variants[0]]['times'])/np.nanmin(data['pipecg']['times']))
+
+# add legend
+handles, labels = ax1.get_legend_handles_labels()
+ax1.legend(handles[::-1], labels[::-1])
+
+# logs scale axes and grids on
+for ax in [ax1,ax2]:
+    ax.set_xscale('log',basex=2)
+    ax.set_yscale('log',basey=2)
+    ax.grid(True,linestyle=':')
+    ax.set_xlabel(f'number of nodes ($\\times {n_cores}$ MPI processes/node)')
 
 
-# scaling percents
+# set y labels
+ax1.set_ylabel('runtime (seconds)')
 
-fig, axs = plt.subplots(1,len(variants),figsize=(8,3))
-for k,variant in enumerate(variants):
-    bottom_sum = np.zeros(len(core_list))
-    for component in time_components:
-        axs[k].bar(np.arange(len(core_list)),data[variant][component],bottom = bottom_sum)
-        bottom_sum += data[variant][component]
-    axs[k].set_xticks(np.arange(len(core_list)),core_list)
-    axs[k].set_title(variant)
+ax2.set_ylabel('$\\times$ speedup over single node')
+ax2.set_ylim(bottom=.75,top=22.0)
 
-axs[-1].legend(time_components,loc='upper left',bbox_to_anchor=(1,1))
-fig.suptitle(f'strong scaling experiment n={mesh_pts}')
-plt.savefig('figures/percents_strong_scale.pdf',bbox_inches='tight')
+plt.subplots_adjust(wspace=.25, hspace=0)
 
+# save
+plt.savefig('figures/strong_scale.pdf',bbox_inches='tight')
+plt.savefig('figures/strong_scale.svg',bbox_inches='tight')

@@ -181,7 +181,7 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
    Tyler Chen, University of Washington, Applied Mathematics Department
 
    Reference:
-   "New communication avoiding conjugate gradient variants". Tyler Chen. In preparation.
+   "Pipelined predict-and-recompute conjugate gradient variants". Tyler Chen. In preparation.
 
    Acknowledgments:
    This material is based upon work supported by the National Science Foundation Graduate Research Fellowship Program under Grant No. DGE-1762114. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author and do not necessarily reflect the views of the National Science Foundation.
