@@ -10,6 +10,10 @@ n_cores = 28
 max_iter = 4000
 mesh_pts = 2048
 
+mesh_pts = 1250
+
+mesh_pts = 1000000
+
 variants = ['cg','chcg','pipecg','pipeprcg_0','pipeprcg']
 node_list = list(range(1,16))
 node_list = [1,2,3,4,5,6,7,8,10,12,14,16,18]
@@ -38,8 +42,20 @@ for variant in variants:
                 tree = ET.parse(f'./logs/{variant}/{mesh_pts}/{n:02d}/{trial_number:02d}.xml')
                 root = tree.getroot()
                 globalperformance = root[0].find('globalperformance')        
+                timertree = root[0].find('timertree')
                 
-                times[k,trial_number] = float(globalperformance.find('time').find('average').text)
+                total_time = float(timertree.find('totaltime').text)
+
+                # look for KSPSolve event, which is the solve stage, to figure out percent of time spent on solve.
+                for child in timertree:
+                    try:
+                        if child.find('name').text == 'KSPSolve':
+                            percent = float(child.find('time').find('value').text)/100
+                            break
+                    except:
+                        pass
+                
+                times[k,trial_number] = total_time #* percent
   
             except:
                 pass
@@ -133,6 +149,7 @@ for variant in variants:
     
     # get minimum runtime for each variant and node
     times = np.nanmin(data[variant]['times'],axis=1)
+#    times = data[variant]['times']
 
     # get style parameters
     lbl = variant_name(variant)
