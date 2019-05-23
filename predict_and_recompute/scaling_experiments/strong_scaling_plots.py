@@ -6,26 +6,23 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
 # set scaling experiment parameters
-n_cores = 28
-max_iter = 4000
-mesh_pts = 2048
+n_cores = 14
 
-mesh_pts = 1250
-
-mesh_pts = 1000000
+#mesh_pts = 2**20
+mesh_pts = 650000
 
 variants = ['cg','chcg','pipecg','pipeprcg_0','pipeprcg']
 node_list = list(range(1,16))
-node_list = [1,2,3,4,5,6,7,8,10,12,14,16,18]
+node_list = [1,2,3,4,5,6,7,8,10,12,14,16,20,24,28,32]
 
-
+#node_list = [1,2,4,8,16,32]
 
 node_list.sort()
 print(node_list)
 
 
 # maximum number of trials
-max_trials = 35
+max_trials = 3
 
 # parse scaling test data
 for variant in variants:
@@ -149,7 +146,7 @@ for variant in variants:
     
     # get minimum runtime for each variant and node
     times = np.nanmin(data[variant]['times'],axis=1)
-#    times = data[variant]['times']
+    #times = data[variant]['times']
 
     # get style parameters
     lbl = variant_name(variant)
