@@ -22,7 +22,7 @@ print(node_list)
 
 
 # maximum number of trials
-max_trials = 3
+max_trials = 9
 
 # parse scaling test data
 for variant in variants:
@@ -146,7 +146,7 @@ for variant in variants:
     
     # get minimum runtime for each variant and node
     times = np.nanmin(data[variant]['times'],axis=1)
-    #times = data[variant]['times']
+#    times = data[variant]['times']
 
     # get style parameters
     lbl = variant_name(variant)
@@ -158,7 +158,8 @@ for variant in variants:
     ax1.plot(node_list,times,linestyle=ls,marker=ms,label=lbl,color=cl,markevery=1)
     ax2.plot(node_list,times[0]/times,linestyle=ls,marker=ms,color=cl,markevery=1)
 
-print(np.nanmin(data[variants[0]]['times'])/np.nanmin(data['pipecg']['times']))
+for variant in variants:
+    print(f"{variant}: {np.nanmin(data[variants[0]]['times'])/np.nanmin(data[variant]['times'])}")
 
 # add legend
 handles, labels = ax1.get_legend_handles_labels()

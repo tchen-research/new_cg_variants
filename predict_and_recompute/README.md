@@ -32,15 +32,19 @@ Then add a plot of this quantity in the `plot_matrix_test` function.
 You will need Python 3.6 or higher, since I use f-strings.
 If you do not have access to Python 3.6, you can replace all f-strings with other string formats and everything should work (if you have a reasonably recent versions of numpy and scipy).
 
+Some of the algorithms are named differnetly in the code than the paper.
+This is due to a previous naming scheme when I was exploring a range of experiments.
+If you can any questions about this, let me know and I can help you get it sorted out.
+
 While lots of the experiments run almost instantly on a laptop, there are other experiments which require much longer (hours or days depending on your hardware).
 The code is fairly modular, so you can test a single variant on a single matrix, and then regenerate the corresponding figure.
 This makes it easier to verify the convergence of a single variant on big problems, since you don't have to run all of the variants.
 
-Github has a filesize limit of 100mb.
-As such, I was not able to upload the matrix `s3dkq4m2`. It can be downloaded from the matrix market](https://math.nist.gov/MatrixMarket/data/misc/cylshell/s3dkq4m2.html).
+Github has a filesize limit of 100mb so I couldn't upload the matrix `s3dkq4m2`.
+It can be downloaded from the matrix market](https://math.nist.gov/MatrixMarket/data/misc/cylshell/s3dkq4m2.html).
 
 Finally, while I have done my best to run a range of representative experiments, it is quite possible that there are problems on which the variants from this paper do not work better than previously known communication hiding variants. 
-If you are able to find any such problems please let me know so that I can include them in the preprint.
+I'd be interested in knowing of such problems so I can use them in tests in the future.
 
 
 ## Repository contents
