@@ -1,12 +1,15 @@
 # New communication hiding conjugate gradient variants
 
 This folder contains materials to help reproduce the results of:
-
+    
     @article{chen_19,
-        author = {Tyler Chen},
-        title = {New communication hiding conjugate gradient variants},
-        journal={arXiv preprint arXiv:1905.01549},
-        year = {2019}
+        title={Predict-and-recompute conjugate gradient variants},
+        author={Tyler Chen},
+        year={2019},
+        eprint={1905.01549},
+        archivePrefix={arXiv},
+        primaryClass={cs.NA},
+        note = {arXiv preprint: 1905.01549}
     }
 
 An extended introduction to this paper can be found [here](https://chen.pw/research/publications/predict_and_recompute.html).
