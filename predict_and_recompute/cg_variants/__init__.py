@@ -74,7 +74,7 @@ from .pipe_m_cg import pipe_m_cg, pipe_pr_m_cg, pipe_m_pcg, pipe_pr_m_pcg
 from .pipe_ch_cg_rr import pipe_ch_cg_rr, pipe_ch_cg_b_rr, pipe_ch_pcg_rr, pipe_ch_pcg_b_rr
 from .pipe_m_cg_rr import pipe_m_cg_rr, pipe_m_cg_b_rr, pipe_m_pcg_rr, pipe_m_pcg_b_rr
 
-from .exact_cg import exact_cg
+from .exact_cg import exact_cg, exact_pcg
 
 
 
