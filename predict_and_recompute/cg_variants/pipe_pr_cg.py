@@ -6,9 +6,9 @@ import scipy as sp
 from scipy import sparse
 from scipy.sparse import linalg
 
-def pipe_ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
+def pipe_pr_master_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
     '''
-    Pipelined communication hiding conjugate gradient
+    master template for pipelined predict-and-recompute conjugate gradients
     (implementation from Chen 2019)
     '''
     
@@ -17,7 +17,7 @@ def pipe_ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
     
     # initialize
     output = {}
-    output['name'] = f"pipe{'_'+variant if variant!= '' else''}_ch_cg"
+    output['name'] = f"pipe_{variant}_cg"
     output['max_iter'] = max_iter
     
     x_k    =  np.copy(x0)
@@ -62,12 +62,13 @@ def pipe_ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
         x_k    =  x_k1  +   a_k1 * p_k1
         r_k    =  r_k1  -   a_k1 * s_k1
         w_k    =  w_k1  -   a_k1 * u_k1
-        nu_k   =  nu_k1 - 2 * a_k1 * del_k1 + a_k1**2 * gam_k1
+        nu_k   = - nu_k1 + a_k1**2 * gam_k1 if variant[-1:] == 'm' else \
+                 nu_k1 - 2 * a_k1 * del_k1 + a_k1**2 * gam_k1
         b_k    =  nu_k / nu_k1
         p_k    =  r_k   +   b_k * p_k1
         s_k    =  w_k   +   b_k * s_k1
         u_k    =  A     @ s_k
-        w_k    =  A     @ r_k if variant == 'pr' else w_k
+        w_k    =  A     @ r_k if variant[:2] == 'pr' else w_k
         mu_k   =  p_k   @ s_k
         del_k  =  r_k   @ s_k
         gam_k  =  s_k   @ s_k
@@ -80,13 +81,39 @@ def pipe_ch_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
             
     return output
 
-def pipe_pr_ch_cg(*args,**kwargs):
-    return pipe_ch_cg(*args,variant='pr',**kwargs)
-
-
-def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[],**kwargs):
+def pipe_p_cg(A,b,x0,max_iter,callbacks=[],**kwargs):
     '''
-    Pipelined communication hiding conjugate gradient (preconditioned)
+    pipelined predict conjugate gradient
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_cg(A,b,x0,max_iter,callbacks=callbacks,variant='p',**kwargs)
+
+def pipe_pr_cg(A,b,x0,max_iter,callbacks=[],**kwargs):
+    '''
+    pipelined predict-and-recompute conjugate gradient
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_cg(A,b,x0,max_iter,callbacks=callbacks,variant='pr',**kwargs)
+
+def pipe_p_m_cg(A,b,x0,max_iter,callbacks=[],**kwargs):
+    '''
+    pipelined predict Meurant conjugate gradient
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_cg(A,b,x0,max_iter,callbacks=callbacks,variant='p_m',**kwargs)
+
+def pipe_pr_m_cg(A,b,x0,max_iter,callbacks=[],**kwargs):
+    '''
+    pipelined predict-and-recompute Meurant conjugate gradient
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_cg(A,b,x0,max_iter,callbacks=callbacks,variant='pr_m',**kwargs)
+
+
+
+def pipe_pr_master_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[],**kwargs):
+    '''
+    master template for pipelined predict-and-recompute conjugate gradients (preconditioned)
     (implementation from Chen 2019)
     '''
     
@@ -95,7 +122,7 @@ def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[
     
     # initialize
     output = {}
-    output['name'] = f"pipe{'_'+variant if variant!= '' else''}_ch_pcg"
+    output['name'] = f"pipe_{variant}_pcg"
     output['max_iter'] = max_iter
     
     x_k    =  np.copy(x0)
@@ -150,21 +177,20 @@ def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[
         rt_k   =  rt_k1 -   a_k1 * st_k1
         w_k    =  w_k1  -   a_k1 * u_k1
         wt_k   =  wt_k1 -   a_k1 * ut_k1
-        nu_k   =  nu_k1 - 2 * a_k1 * del_k1 + a_k1**2 * gam_k1
+        nu_k   = - nu_k1 + a_k1**2 * gam_k1 if variant[-1:] == 'm' else nu_k1 - 2 * a_k1 * del_k1 + a_k1**2 * gam_k1
         b_k    =  nu_k / nu_k1
         p_k    =  rt_k  +   b_k * p_k1
         s_k    =  w_k   +   b_k * s_k1
         st_k   =  wt_k  +   b_k * st_k1
         u_k    =  A     @ st_k 
         ut_k   =  preconditioner(u_k)
-        w_k    =  A     @ rt_k if variant == 'pr' else w_k
-        wt_k   =  preconditioner(w_k) if variant == 'pr' else wt_k
+        w_k    =  A     @ rt_k if variant[:2] == 'pr' else w_k
+        wt_k   =  preconditioner(w_k) if variant[:2] == 'pr' else wt_k
         mu_k   =  p_k   @ s_k
         del_k  =  r_k   @ st_k # or rt_k @ s_k or p_k @ s_k
         gam_k  =  st_k  @ s_k 
         nu_k   =  rt_k  @ r_k 
         a_k    =  nu_k / mu_k
-    
         
         # call callback functions
         for callback in callbacks:
@@ -172,5 +198,32 @@ def pipe_ch_pcg(A,b,x0,max_iter,variant='',preconditioner=lambda x:x,callbacks=[
             
     return output
 
-def pipe_pr_ch_pcg(*args,**kwargs):
-    return pipe_ch_pcg(*args,variant='pr',**kwargs)
+def pipe_p_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,callbacks=[],**kwargs):
+    '''
+    pipelined predict conjugate gradient (preconditioned)
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_pcg(A,b,x0,max_iter,preconditioner=preconditioner,callbacks=callbacks,variant='p',**kwargs)
+
+def pipe_pr_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,callbacks=[],**kwargs):
+    '''
+    pipelined predict-and-recompute conjugate gradient (preconditioned)
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_pcg(A,b,x0,max_iter,preconditioner=preconditioner,callbacks=callbacks,variant='pr',**kwargs)
+
+def pipe_p_m_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,callbacks=[],**kwargs):
+    '''
+    pipelined predict Meurant conjugate gradient (preconditioned)
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_pcg(A,b,x0,max_iter,preconditioner=preconditioner,callbacks=callbacks,variant='p_m',**kwargs)
+
+def pipe_pr_m_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,callbacks=[],**kwargs):
+    '''
+    pipelined predict-and-recompute Meurant conjugate gradient (preconditioned)
+    (implementation from Chen 2019)
+    '''
+    return pipe_pr_master_pcg(A,b,x0,max_iter,preconditioner=preconditioner,callbacks=callbacks,variant='pr_m',**kwargs)
+
+

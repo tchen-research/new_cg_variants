@@ -61,20 +61,22 @@ STYLE GUIDE
     6 spaces from start of vector before next operation
 
 '''
+from .exact_cg import exact_cg, exact_pcg
 
 from .hs_cg import hs_cg, hs_pcg
 from .cg_cg import cg_cg, cg_pcg
 from .gv_cg import gv_cg, gv_pcg
-from .m_cg import m_cg, m_pcg
 
-from .ch_cg import ch_cg, ch_pcg
-from .pipe_ch_cg import pipe_ch_cg, pipe_pr_ch_cg, pipe_ch_pcg, pipe_pr_ch_pcg
-from .pipe_m_cg import pipe_m_cg, pipe_pr_m_cg, pipe_m_pcg, pipe_pr_m_pcg
+from .pr_cg import pr_cg, pr_pcg
+from .pr_cg import m_cg, m_pcg
 
-from .pipe_ch_cg_rr import pipe_ch_cg_rr, pipe_ch_cg_b_rr, pipe_ch_pcg_rr, pipe_ch_pcg_b_rr
-from .pipe_m_cg_rr import pipe_m_cg_rr, pipe_m_cg_b_rr, pipe_m_pcg_rr, pipe_m_pcg_b_rr
+from .pipe_pr_cg import pipe_p_m_cg, pipe_pr_m_cg, pipe_p_m_pcg, pipe_pr_m_pcg
+from .pipe_pr_cg import pipe_p_cg, pipe_pr_cg, pipe_p_pcg, pipe_pr_pcg
 
-from .exact_cg import exact_cg, exact_pcg
+
+#from .pipe_ch_cg_rr import pipe_ch_cg_rr, pipe_ch_cg_b_rr, pipe_ch_pcg_rr, pipe_ch_pcg_b_rr
+#from .pipe_m_cg_rr import pipe_m_cg_rr, pipe_m_cg_b_rr, pipe_m_pcg_rr, pipe_m_pcg_b_rr
+
 
 
 

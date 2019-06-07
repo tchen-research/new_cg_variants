@@ -104,6 +104,8 @@ def exact_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,callbacks=[],**kwargs):
     a_k2   =  0
     b_k    =  0
     b_k1   =  0
+
+    tol = np.sqrt(nu_k) * 1e-14
         
     k=0
     for callback in callbacks:
@@ -143,5 +145,11 @@ def exact_pcg(A,b,x0,max_iter,preconditioner=lambda x:x,callbacks=[],**kwargs):
         # call callback functions
         for callback in callbacks:
             callback(**locals())
+
+        if np.sqrt(nu_k) < tol:
+            break
+
+        if k%10==0:
+            print(np.sqrt(nu_k),tol)
         
     return output
