@@ -36,6 +36,8 @@ def lanczos_recurrence(**kwargs):
     Notes
     -----
     could rearange the logic control staements to reduce the length but I'm not sure if it would increase performance or clarity
+
+    if only the 3 term error and orthogonality are wanted, then maybe better to not save the whole set of lanczos vectors for storage reasons
     """
     
     output = kwargs['output']

@@ -2,6 +2,8 @@ import numpy as np
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 
+import os
+
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
@@ -11,7 +13,7 @@ n_cores = 14
 #mesh_pts = 2**20
 mesh_pts = 650000
 
-variants = ['cg','chcg','pipecg','pipeprcg_0','pipeprcg']
+variants = ['cg','prcg','pipecg','pipeprcg_0','pipeprcg']
 node_list = list(range(1,16))
 node_list = [1,2,3,4,5,6,7,8,10,12,14,16,20,24,28,32]
 
@@ -20,6 +22,8 @@ node_list = [1,2,3,4,5,6,7,8,10,12,14,16,20,24,28,32]
 node_list.sort()
 print(node_list)
 
+os.system(f'mkdir -p ./data')
+os.system(f'mkdir -p ./figures')
 
 # maximum number of trials
 max_trials = 9
@@ -65,78 +69,14 @@ data = {}
 for variant in variants:
     data[variant] = np.load(f'data/{variant}_strong_scale.npy',allow_pickle=True).item()
 
-# define some helper functions to get formatting information for plotting
-def variant_name(name):
-    
-    formatted_name = name.upper() 
-    if name == 'hscg':
-        formatted_name = 'HS-CG'
-    elif name == 'chcg':
-        formatted_name = 'PR-CG'
-    elif name == 'pipecg':
-        formatted_name = 'GV-CG'
-    elif name == 'pipeprcg':
-        formatted_name = 'PPR-CG$^*$'
-    elif name == 'pipeprcg_0':
-        formatted_name = 'PP-CG'
-
-    return f"\\textsc{{{formatted_name}}}"
-
-def variant_marker(name):
-    
-    if name == 'cg':
-        return 'o'
-    elif name == 'pipecg':
-        return 's'
-    
-    return '.'
-
-def variant_line_style(name):
-    
-    if name == 'chcg':
-        return ':'
-    elif name == 'pipeprcg_0':
-        return '--'
-    elif name == 'pipeprcg':
-        return '-'
-
-    return '-'
-
-def variant_color(name):
-    
-    # if one of default variants
-    for string in ['cg','hscg','pipecg']:
-        if name == string:
-            return '#93a1a1'
-    return '#073642'
-
-def grey_out(color):
-    new_color = '#'
-    
-    r,g,b = (int(color[i:i+2],16) for i in [1,3,5])
-    
-    f = 0.5
-    L = 0.3* + 0.6*g + 0.1*b
-
-    for c in (r,g,b):
-        new_color += hex(min(int( (c + f * (L - c)) ),255))[2:].zfill(2)
-
-    return new_color
-
-def lighten(color):
-    new_color = '#'
-    
-    r,g,b = (int(color[i:i+2],16) for i in [1,3,5])
- 
-    scale = .6
-
-    for c in (r,g,b):
-        new_color += hex(min(int( c + (255-c)*scale ),255))[2:].zfill(2)
-
-    return new_color
-
-   
-
+varaint_styles = {
+    'exact_pcg': {'label':'exact','linestyle':':','marker':None,'color':'#93a1a1','offset':0},
+    'cg': {'label':'HS-CG','linestyle':'-','marker':'o','color':'#93a1a1','offset':0},
+    'pipecg': {'label':'GV-CG','linestyle':'-','marker':'s','color':'#93a1a1','offset':3/4},
+    'prcg': {'label':'PR-CG','linestyle':':','marker':'.','color':'#073642','offset':0}, # note the name difference
+    'pipeprcg_0': {'label':'\\textsc{pipe-P-CG}','linestyle':'--','marker':'.','color':'#073642','offset':0},
+    'pipeprcg': {'label':'\\textsc{pipe-PR-CG}','linestyle':'-','marker':'.','color':'#073642','offset':0},
+}
 
 # plot scaling times
 t0 = np.nanmin(data[variants[0]]['times'][0])
@@ -149,11 +89,12 @@ for variant in variants:
 #    times = data[variant]['times']
 
     # get style parameters
-    lbl = variant_name(variant)
-    ms = variant_marker(variant)
-    ls = variant_line_style(variant)
-    cl = variant_color(variant)
+    styles = varaint_styles[variant]
 
+    lbl = styles['label']
+    ms = styles['marker']
+    cl = styles['color']
+    ls = styles['linestyle']
    
     ax1.plot(node_list,times,linestyle=ls,marker=ms,label=lbl,color=cl,markevery=1)
     ax2.plot(node_list,times[0]/times,linestyle=ls,marker=ms,color=cl,markevery=1)

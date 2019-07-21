@@ -7,6 +7,7 @@ from scipy import sparse
 from scipy.sparse import linalg
 
 from .error_A_norm import error_A_norm
+from .error_2_norm import error_2_norm
 from .residual_2_norm import residual_2_norm
 from .updated_residual_2_norm import updated_residual_2_norm
 from .lanczos_recurrence import lanczos_recurrence

@@ -127,7 +127,7 @@ mesh_pts = 650000
 
 num_experiment_repeats = 10
 
-variants = ['cg','chcg','pipecg','pipeprcg','pipeprcg_0']
+variants = ['cg','prcg','pipecg','pipeprcg','pipeprcg_0']
 node_list = [1,2,3,4,5,6,7,8,10,12,14,16,20,24,28,32][::-1]
 
 #node_list = [1,32,16,8,4]

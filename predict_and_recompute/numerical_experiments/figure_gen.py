@@ -10,7 +10,7 @@ sys.path.append('../')
 import os
 
 from cg_variants import *
-from callbacks import error_A_norm, residual_2_norm, updated_residual_2_norm, print_k
+from callbacks import error_A_norm, residual_2_norm, error_2_norm, updated_residual_2_norm, print_k
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
@@ -18,10 +18,10 @@ plt.rc('font', family='serif')
 EPSILON_MACHINE = 1e-16
 
 #%%
-def test_matrix(A,max_iter,title,preconditioner=None):
+def test_matrix(A,max_iter,title,preconditioner=None,variants=[]):
     """
     generate data for convergence of variants on A
-    
+
     Note
     ----
     should write it to adaptively add methods if they have already been complete
@@ -32,69 +32,65 @@ def test_matrix(A,max_iter,title,preconditioner=None):
     x_true = np.ones(N) / np.sqrt(N)
     b = A@x_true
     x0 = np.zeros(N)
-#    x_true = sp.sparse.linalg.spsolve(A,b)
-
-    # define methods to use
-    methods = [hs_pcg,cg_pcg,m_pcg,gv_pcg,ch_pcg,pipe_m_pcg,pipe_pr_m_pcg,pipe_ch_pcg,pipe_pr_ch_pcg]
-    methods = []
-    
+   
     # define callbacks to use
-    callbacks = [error_A_norm,residual_2_norm,updated_residual_2_norm,print_k(10)]
+    callbacks = [error_A_norm,residual_2_norm,error_2_norm,updated_residual_2_norm,print_k(10)]
     
+    # define preconditioners
     prec = lambda x:x
     prec_long = lambda x:x
     if preconditioner=='jacobi':
         prec = lambda x: (1/A.diagonal())*x
         prec_long = lambda x: (1/A.diagonal().astype(np.longdouble))*x
-#        x_true = np.sqrt(A.diagonal())*x_true
-#        D = sp.sparse.spdiags([1/np.sqrt(A.diagonal())],0,N,N)
-#        A = D@A@D
-#        b = D@b
-        
-    # run methods
+    
+    # set up directory
     os.system(f'mkdir -p ./data/{title}_{preconditioner}')
     
-    trial = exact_pcg(A.astype(np.longdouble),b.astype(np.longdouble),x0.astype(np.longdouble),min(max_iter,N),callbacks=callbacks,x_true=x_true.astype(np.longdouble),preconditioner=prec_long)
-    np.save(f'./data/{title}_{preconditioner}/{exact_pcg.__name__}',trial,allow_pickle=True)
+    # run rest of methods
+    for method in variants:
+
+        # check if exact cg to use higher precision
+        if method == exact_pcg:
+            trial = exact_pcg(A.astype(np.longdouble),b.astype(np.longdouble),x0.astype(np.longdouble),min(max_iter,N),callbacks=callbacks,x_true=x_true.astype(np.longdouble),preconditioner=prec_long)
+            np.save(f'./data/{title}_{preconditioner}/exact_pcg',trial,allow_pickle=True)
+            continue
    
-    for method in methods:
+        # otherwise use normal precision
         trial = method(A,b,x0,max_iter,callbacks=callbacks,x_true=x_true,preconditioner=prec)
         np.save(f'./data/{title}_{preconditioner}/{method.__name__}',trial,allow_pickle=True)
     
 #%%
-def gen_convergence_data(matrix_name,preconditioner=None):
+def parse_convergence_data(matrix_name,preconditioner=None,variants=[]):
     """
     gather convergence data from trials and save as a row of a latex table
     """
     
     # get matrix information
+    # really this should probably be saved as a different file so we don't have to load the whole matrix
+
     A = sp.sparse.csr_matrix(sp.io.mmread(f"../matrices/{matrix_name}.mtx"))
 
     n,_ = A.shape
     nnz = A.nnz    
         
     # get convergence information
-    
-    #methods = ['hs_pcg','cg_pcg','m_pcg','ch_pcg','gv_pcg','pipe_m_pcg','pipe_ch_pcg','pipe_pr_m_pcg','pipe_pr_ch_pcg']
-    methods = ['hs_pcg','cg_pcg','m_pcg','ch_pcg','gv_pcg','pipe_pr_m_pcg','pipe_pr_ch_pcg']
-    methods = ['exact_pcg']
     min_iters = []
     min_errors = []
     
     error_tol = 1e-5
     
-    for method in methods:
+    for method in variants:
         
         trial = np.load(f'./data/{matrix_name}_{preconditioner}/{method}.npy',allow_pickle=True).item()
         
         rel_error_A_norm = trial['error_A_norm']/trial['error_A_norm'][0]
-
+        
         min_iters.append(np.argmin(rel_error_A_norm>error_tol))
         min_errors.append(np.log10(np.nanmin(rel_error_A_norm)))
         
     
     # generate data string for tex table
-    formatted_matrix_name = r'{\tt '+matrix_name.replace('_','\_')+r' }'
+    formatted_matrix_name = r'\texttt{'+matrix_name.replace('_','\_')+r'}'
     
     formatted_preconditioner = '-'
     if preconditioner == 'jacobi':
@@ -124,174 +120,102 @@ def gen_convergence_table():
     merge all data from gen_convergence_data into single latex table
     """
     
-#    os.chdir('./data/')
-#    print(os.getcwd() + "\n")
     os.system('cat ./data/*None/*convergence.txt > ./figures/convergence_table_data.tex')
     os.system('cat ./data/*jacobi/*convergence.txt >> ./figures/convergence_table_data.tex')
-#    os.chdir('..')
 
 #%%
-def variant_name(name):
-    if name == 'ch_pcg':
-        return "\\textsc{{PR-CG}}"
-    elif name == 'pipe_pr_ch_pcg':
-        return "\\textsc{{PPR-CG}}"
-    elif name == 'pipe_pr_m_pcg':
-        return "\\textsc{{PPR-M-CG}}"
-    elif name == 'pipe_m_pcg':
-        return "\\textsc{{P-M-CG}}"
-    elif name == 'pipe_ch_pcg':
-        return "\\textsc{{PP-CG}}"
-    formatted_name = name.upper().replace('PCG','CG').replace('_','-')
+varaint_styles = {
+    'exact_pcg': {'label':'exact','linestyle':':','marker':None,'color':'#93a1a1','offset':0},
+    'hs_pcg': {'label':'HS-CG','linestyle':'-','marker':'o','color':'#93a1a1','offset':0},
+    'cg_pcg': {'label':'CG-CG','linestyle':'-','marker':'^','color':'#93a1a1','offset':1/4},
+    'm_pcg': {'label':'M-CG','linestyle':'-','marker':'v','color':'#93a1a1','offset':2/4},
+    'gv_pcg': {'label':'GV-CG','linestyle':'-','marker':'s','color':'#93a1a1','offset':3/4},
+ 
+    'pipe_p_m_pcg': {'label':'\\textsc{pipe-P-M-CG}','linestyle':'-','marker':None,'color':'#6c71c4','offset':0},
+    'pipe_pr_m_pcg': {'label':'\\textsc{pipe-PR-M-CG}','linestyle':':','marker':None,'color':'#859900','offset':0},
     
-    return f"\\textsc{{{formatted_name}}}"
+    'pr_pcg': {'label':'PR-CG','linestyle':':','marker':None,'color':'#073642','offset':0},
+    'pipe_p_pcg': {'label':'\\textsc{pipe-P-CG}','linestyle':'-','marker':None,'color':'#2aa198','offset':0},
+    'pipe_pr_pcg': {'label':'\\textsc{pipe-PR-CG}','linestyle':'-','marker':None,'color':'#073642','offset':0},
+   
+}
 
-def variant_marker(name):
-    
-    if name[:3] == 'hs_':
-        return 'o'
-    elif name[:3] == 'cg_':
-        return '^'
-    elif name[:2] == 'm_':
-        return 'v'
-    elif name[:3] == 'gv_':
-        return 's'
-    
-    return None
+def add_plot(trial,quantity,ax,num_markers,title='',pc=''):
+    """
+    helper function to add plots
+    """
+    styles = varaint_styles[trial['name']]
 
-def variant_offset(name,spacing):
-    
-    if name[:3] == 'hs_':
-        return 0
-    elif name[:3] == 'cg_':
-        return spacing/4
-    elif name[:2] == 'm_':
-        return 2*spacing/4
-    elif name[:3] == 'gv_':
-        return 3*spacing/4
-    
-    return 0
+    lbl = styles['label']
+    ms = styles['marker']
+    cl = styles['color']
+    ls = styles['linestyle']
+    vo = styles['offset']/num_markers
 
-def variant_line_style(name):
-    
-    if name == 'pipe_m_pcg':
-        return '-'
-    elif name == 'ch_pcg':
-        return ':'
-    elif name == 'pipe_ch_pcg':
-        return '-'
-    elif name == 'pipe_pr_m_pcg':
-        return ':'
-    elif name == 'pipe_pr_ch_pcg':
-        return '-'
-    elif name == 'exact_pcg':
-        return ':'
-
-    return '-'
+    # subsample for plots
+    skip = max(1,trial['max_iter'] // 1000) # downsample if there are a lot of iterations
+    num_pts = len(np.arange(trial['max_iter'])[::skip])
+        
+    ax.plot(np.arange(trial['max_iter'])[::skip],trial[quantity][::skip]/trial[quantity][0],label=lbl,linestyle=ls,color=cl,marker=ms,markevery=(int(vo*num_pts),num_pts//num_markers))
+    if title != '':
+        ax.set_title(f"\\texttt{{{title}}}{', prec.='+pc.capitalize() if pc else ''}")
 
 
-def variant_color(name):
-    
-    # if one of default variants
-    for string in ['exa','hs_','cg_','m_c','m_p','gv_']:
-        if name[:3] == string:
-            return '#93a1a1'
-    if name == 'pipe_m_pcg':
-        return '#6c71c4'
-    elif name == 'ch_pcg':
-        return '#073642'#'#d33682'
-    elif name == 'pipe_ch_pcg':
-        return '#2aa198'
-    elif name == 'pipe_pr_m_pcg':
-        return '#859900'
-    elif name == 'pipe_pr_ch_pcg':
-        return '#073642'
-
-
-def plot_matrix_test(title,preconditioner=None,quantity='error_A_norm',methods=['exact_pcg','hs_pcg', 'cg_pcg', 'm_pcg', 'gv_pcg','ch_pcg','pipe_pr_ch_pcg'],ylabel=True):
+def plot_matrix_test(title,preconditioner=None,quantity='error_A_norm',variants=[],ylabel=True):
     """
     plot convergence data on single plot
     """
     
     num_markers = 5
     
-    def add_plot(trial,ax):
-        lbl = variant_name(trial['name'])
-        ms = variant_marker(trial['name'])
-        vo = variant_offset(trial['name'],1/num_markers)
-        ls = variant_line_style(trial['name'])
-        cl = variant_color(trial['name'])
-
-        # subsample for plots
-        skip = max(1,trial['max_iter'] // 1000) # downsample if there are a lot of iterations
-        num_pts = len(np.arange(trial['max_iter'])[::skip])
-        
-        ax.plot(np.arange(trial['max_iter'])[::skip],trial[quantity][::skip]/trial[quantity][0],label=lbl,linestyle=ls,color=cl,marker=ms,markevery=(int(vo*num_pts),num_pts//num_markers))
-
-    # load data
+    f, ax = plt.subplots(1, 1, sharex=True, sharey=True, figsize=(6,4))
     
-    
-    f, ax1 = plt.subplots(1, 1, sharex=True, sharey=True, figsize=(6,4))
-    
-    for method in methods: 
+    # add plot for each method
+    for method in variants: 
         trial = np.load(f'./data/{title}_{preconditioner}/{method}.npy',allow_pickle=True).item()
-        add_plot(trial,ax1)
+        add_plot(trial,quantity,ax,num_markers)
        
-    ax1.set_yscale('log')
-    ax1.set_ylim(1e-16,5)
+    # adjust axes and labels
+    ax.set_yscale('log')
+    ax.set_ylim(1e-16,5)
     
     if ylabel:
-        ax1.set_ylabel('$A$-norm of error: $\| x-x_k \|_A$')
+        ax.set_ylabel('$\mathbf{A}$-norm of error: $\| \mathbf{x}-\mathbf{x}_k \|_\mathbf{A}$')
 
-        handles, labels = ax1.get_legend_handles_labels()
-        ax1.legend(handles[::-1], labels[::-1], loc='upper left', bbox_to_anchor=(1,1))
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles[::-1], labels[::-1], loc='upper left', bbox_to_anchor=(1,1))
     else:
-        ax1.yaxis.set_ticklabels([])    
-    ax1.set_xlabel('iteration $k$')
-    ax1.grid(True,linestyle=':')
+        ax.yaxis.set_ticklabels([])    
+    ax.set_xlabel('iteration $k$')
+    ax.grid(True,linestyle=':')
 
-#    plt.suptitle(f"{title}, $A$-norm of error: $\| x-x_k \|_A$")
-#    ax1.set_title('new variants')
-#    ax2.set_title('new pipelined variants')
-    
-#    plt.subplots_adjust(wspace=.05, hspace=0)    
+    os.system(f'mkdir -p ./figures')
     plt.savefig(f'figures/{title}_{preconditioner}_{quantity}{"" if ylabel else "_nolbl"}.pdf',bbox_inches='tight')
     plt.savefig(f'figures/{title}_{preconditioner}_{quantity}{"" if ylabel else "_nolbl"}.svg',bbox_inches='tight')
     plt.close()
 
-def plot_matrices_test(titles,preconditioners,quantity='error_A_norm'):
+
+def plot_matrices_test(titles,preconditioners,quantity='error_A_norm',variants=[]):
     """
     plot convergence data
     """
     
     num_markers = 5
     
-    def add_plot(trial,ax,title,pc):
-        lbl = variant_name(trial['name'])
-        ms = variant_marker(trial['name'])
-        vo = variant_offset(trial['name'],1/num_markers)
-        ls = variant_line_style(trial['name'])
-        cl = variant_color(trial['name'])
-
-        # subsample for plots
-        skip = max(1,trial['max_iter'] // 1000) # downsample if there are a lot of iterations
-        num_pts = len(np.arange(trial['max_iter'])[::skip])
-        
-        ax.plot(np.arange(trial['max_iter'])[::skip],trial[quantity][::skip]/trial[quantity][0],label=lbl,linestyle=ls,color=cl,marker=ms,markevery=(int(vo*num_pts),num_pts//num_markers))
-        ax.set_title(f"{{\\tt {title}}}{', prec.='+pc.capitalize() if pc else ''}")
-
     # load data
-    
-    f, axs = plt.subplots(1, len(titles), sharex=False, sharey=True, figsize=(14,4))
-    
+    f, axs = plt.subplots(1, 3, sharex=False, sharey=True, figsize=(14,4))
+    print(axs)
     for k,ax in enumerate(axs):
-        for method in ['hs_pcg', 'cg_pcg', 'm_pcg', 'gv_pcg','ch_pcg','pipe_pr_ch_pcg']:
+        if k >= len(titles):
+            continue 
+
+        for method in variants:
             trial = np.load(f'./data/{titles[k]}_{preconditioners[k]}/{method}.npy',allow_pickle=True).item()
-            add_plot(trial,ax,titles[k].replace('_','\_'),preconditioners[k])
+            add_plot(trial,quantity,ax,num_markers,titles[k].replace('_','\_'),preconditioners[k])
 
     axs[0].set_yscale('log')
     axs[0].set_ylim(1e-16,5)
-    axs[0].set_ylabel('$A$-norm of error: $\| x-x_k \|_A$')
+    axs[0].set_ylabel('$\mathbf{A}$-norm of error: $\| \mathbf{x}-\mathbf{x}_k \|_\mathbf{A}$')
     
 
     handles, labels = axs[0].get_legend_handles_labels()
@@ -306,6 +230,7 @@ def plot_matrices_test(titles,preconditioners,quantity='error_A_norm'):
 #    ax1.set_title('new variants')
 #    ax2.set_title('new pipelined variants')
     
+    os.system(f'mkdir -p ./figures')
     plt.subplots_adjust(wspace=.05, hspace=0)
     plt.savefig(f"figures/{'-'.join(titles)}_{'-'.join([str(pc) for pc in preconditioners])}_{quantity}.pdf",bbox_inches='tight')
     plt.savefig(f"figures/{'-'.join(titles)}_{'-'.join([str(pc) for pc in preconditioners])}_{quantity}.svg",bbox_inches='tight')
@@ -360,7 +285,7 @@ matrices += [
     ['nos4',150,None],
     ['nos5',600,None],
     ['nos6',2400,None],
-    ['nos7',7000,None], # GVCG doesn't even work.. 
+    ['nos7',7000,None],
 ]
 
 matrices += [
@@ -393,7 +318,7 @@ matrices += [
     ['s1rmt3m1',1200,'jacobi'],
     ['s2rmq4m1',2100,'jacobi'],
     ['s2rmt3m1',3000,'jacobi'],
-#    ['s3dkq4m2',60000,'jacobi'], # too big for github, download from matrix market
+    ['s3dkq4m2',60000,'jacobi'], # too big for github, download from matrix market
     ['s3dkt3m2',75000,'jacobi'], 
     ['s3rmq4m1',12000,'jacobi'],
     ['s3rmt3m1',17000,'jacobi'],
@@ -412,36 +337,33 @@ matrices += [
     ['s3rmt3m3',250000,None],
 ]
 
-matrices = [
-    ['bcsstk03',1250,None],
-    ['bcsstk14',25000,None],
-    ['bcsstk15',35000,None],
-    ['bcsstk16',900,None],
-#    ['bcsstk17',45000,None],
-#    ['bcsstk18',1750000,None],
-    ['bcsstk27',2300,None],
-]
-
-
-
 #%%
 # NOW RUN TESTS AND GENERATE FIGURES
 
 for matrix_name,max_iter,preconditioner in matrices:
     print(f'matrix: {matrix_name}, preconditioner: {preconditioner}')
+    
+    methods = [hs_pcg,cg_pcg,m_pcg,gv_pcg]
+    methods += [pipe_p_m_pcg,pipe_pr_m_pcg]
+    methods += [pr_pcg, pipe_p_pcg, pipe_pr_pcg]
 
     A = sp.sparse.csr_matrix(sp.io.mmread(f"../matrices/{matrix_name}.mtx"))
-    test_matrix(A,max_iter,matrix_name,preconditioner)
+    test_matrix(A,max_iter,matrix_name,preconditioner,variants=methods)
 
-#    gen_convergence_data(matrix_name,preconditioner)
+    # make plots
+    methods_str = [method.__name__ for method in methods]
+    plot_matrix_test(matrix_name,preconditioner,'error_A_norm',variants=methods_str)
+    plot_matrix_test(matrix_name,preconditioner,'error_2_norm',variants=methods_str)
+    plot_matrix_test(matrix_name,preconditioner,'residual_2_norm',variants=methods_str)
+
+    # generate convergence table with selected variants
+    paper_methods = ['hs_pcg','cg_pcg','m_pcg','pr_pcg','gv_pcg','pipe_pr_m_pcg','pipe_pr_pcg']
+    parse_convergence_data(matrix_name,preconditioner,variants=paper_methods)
     
-    methods = ['exact_pcg','hs_pcg', 'cg_pcg', 'm_pcg', 'gv_pcg','ch_pcg','pipe_m_pcg','pipe_ch_pcg','pipe_pr_m_pcg','pipe_pr_ch_pcg']
-    plot_matrix_test(matrix_name,preconditioner,'error_A_norm',methods=methods)
-    plot_matrix_test(matrix_name,preconditioner,'residual_2_norm',methods=methods)
-
 gen_convergence_table()
 
 #%%
 # GENERATE GROUPED PLOTS
-#plot_matrices_test(['model_48_8_3','bcsstk03','s3rmq4m1'],[None,None,'jacobi'],quantity='error_A_norm')
-#plot_matrices_test(['model_48_8_3','bcsstk03','s3rmq4m1'],[None,None,'jacobi'],quantity='residual_2_norm')
+variants = ['hs_pcg', 'cg_pcg', 'm_pcg', 'gv_pcg','pr_pcg','pipe_pr_pcg']
+for quantity in ['error_A_norm','error_2_norm','residual_2_norm']:
+    plot_matrices_test(['bcsstk15','s3rmq4m1','bcsstk03'],['jacobi','jacobi',None],quantity=quantity,variants=variants)
