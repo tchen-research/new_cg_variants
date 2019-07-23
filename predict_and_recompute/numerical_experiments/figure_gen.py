@@ -203,9 +203,9 @@ def plot_matrices_test(titles,preconditioners,quantity='error_A_norm',variants=[
     num_markers = 5
     
     # load data
-    f, axs = plt.subplots(1, 3, sharex=False, sharey=True, figsize=(14,4))
-    print(axs)
-    for k,ax in enumerate(axs):
+    f, axs = plt.subplots(2, 2, sharex=False, sharey=True, figsize=(11,7.5))
+    print(axs.flatten())
+    for k,ax in enumerate(axs.flatten()):
         if k >= len(titles):
             continue 
 
@@ -213,15 +213,16 @@ def plot_matrices_test(titles,preconditioners,quantity='error_A_norm',variants=[
             trial = np.load(f'./data/{titles[k]}_{preconditioners[k]}/{method}.npy',allow_pickle=True).item()
             add_plot(trial,quantity,ax,num_markers,titles[k].replace('_','\_'),preconditioners[k])
 
-    axs[0].set_yscale('log')
-    axs[0].set_ylim(1e-16,5)
-    axs[0].set_ylabel('$\mathbf{A}$-norm of error: $\| \mathbf{x}-\mathbf{x}_k \|_\mathbf{A}$')
+    axs[0,0].set_yscale('log')
+    axs[0,0].set_ylim(1e-16,5)
+    axs[0,0].set_ylabel('$\mathbf{A}$-norm of error: $\| \mathbf{x}-\mathbf{x}_k \|_\mathbf{A}$')
+    axs[1,0].set_ylabel('$\mathbf{A}$-norm of error: $\| \mathbf{x}-\mathbf{x}_k \|_\mathbf{A}$')
     
 
-    handles, labels = axs[0].get_legend_handles_labels()
-    axs[0].legend(handles[::-1], labels[::-1], loc='lower left')
+    handles, labels = axs[0,0].get_legend_handles_labels()
+    axs[0,0].legend(handles[::-1], labels[::-1], loc='lower left')
 
-    for k,ax in enumerate(axs):
+    for k,ax in enumerate(axs.flatten()):
         
         ax.set_xlabel('iteration $k$')
         ax.grid(True,linestyle=':')
@@ -231,7 +232,7 @@ def plot_matrices_test(titles,preconditioners,quantity='error_A_norm',variants=[
 #    ax2.set_title('new pipelined variants')
     
     os.system(f'mkdir -p ./figures')
-    plt.subplots_adjust(wspace=.05, hspace=0)
+    plt.subplots_adjust(wspace=.05, hspace=.35)
     plt.savefig(f"figures/{'-'.join(titles)}_{'-'.join([str(pc) for pc in preconditioners])}_{quantity}.pdf",bbox_inches='tight')
     plt.savefig(f"figures/{'-'.join(titles)}_{'-'.join([str(pc) for pc in preconditioners])}_{quantity}.svg",bbox_inches='tight')
     plt.close()
@@ -339,7 +340,7 @@ matrices += [
 
 #%%
 # NOW RUN TESTS AND GENERATE FIGURES
-
+"""
 for matrix_name,max_iter,preconditioner in matrices:
     print(f'matrix: {matrix_name}, preconditioner: {preconditioner}')
     
@@ -361,9 +362,9 @@ for matrix_name,max_iter,preconditioner in matrices:
     parse_convergence_data(matrix_name,preconditioner,variants=paper_methods)
     
 gen_convergence_table()
-
+"""
 #%%
 # GENERATE GROUPED PLOTS
 variants = ['hs_pcg', 'cg_pcg', 'm_pcg', 'gv_pcg','pr_pcg','pipe_pr_pcg']
 for quantity in ['error_A_norm','error_2_norm','residual_2_norm']:
-    plot_matrices_test(['bcsstk15','s3rmq4m1','bcsstk03'],['jacobi','jacobi',None],quantity=quantity,variants=variants)
+    plot_matrices_test(['bcsstk15','s3rmq4m1','bcsstk03','model_48_8_3'],['jacobi','jacobi',None,None],quantity=quantity,variants=variants)

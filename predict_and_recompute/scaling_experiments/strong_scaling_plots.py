@@ -80,7 +80,7 @@ varaint_styles = {
 
 # plot scaling times
 t0 = np.nanmin(data[variants[0]]['times'][0])
-fig, (ax1,ax2) = plt.subplots(1,2,figsize=(14,4))
+fig, (ax1,ax2) = plt.subplots(1,2,figsize=(10,3))
 
 for variant in variants:
     
