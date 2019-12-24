@@ -5,7 +5,7 @@ from scipy.io import loadmat
 import matplotlib.pyplot as plt
   
 import sys
-sys.path.append('../')
+#sys.path.append('../')
 
 import os
 
@@ -340,7 +340,6 @@ matrices += [
 
 #%%
 # NOW RUN TESTS AND GENERATE FIGURES
-"""
 for matrix_name,max_iter,preconditioner in matrices:
     print(f'matrix: {matrix_name}, preconditioner: {preconditioner}')
     
@@ -362,7 +361,7 @@ for matrix_name,max_iter,preconditioner in matrices:
     parse_convergence_data(matrix_name,preconditioner,variants=paper_methods)
     
 gen_convergence_table()
-"""
+
 #%%
 # GENERATE GROUPED PLOTS
 variants = ['hs_pcg', 'cg_pcg', 'm_pcg', 'gv_pcg','pr_pcg','pipe_pr_pcg']
