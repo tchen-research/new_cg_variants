@@ -7,5 +7,4 @@ Then update:
 - `src/ksp/ksp/impls/cg/makefile`
 - `src/ksp/ksp/interface/itregis.c`
 - `include/petscksp.h`
-- `CMakeLists.txt`
 

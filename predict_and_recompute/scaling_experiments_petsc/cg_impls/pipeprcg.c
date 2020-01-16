@@ -1,5 +1,9 @@
-
 #include <petsc/private/kspimpl.h>
+
+typedef struct KSP_CG_PIPE_PR_s KSP_CG_PIPE_PR;
+struct KSP_CG_PIPE_PR_s {
+  PetscBool   rc_w_q; /* flag to determine whether w_k should be recomputer with A r_k */
+};
 
 /*
      KSPSetUp_PIPEPRCG - Sets up the workspace needed by the PIPEPRCG method.
@@ -14,12 +18,26 @@ static PetscErrorCode KSPSetUp_PIPEPRCG(KSP ksp)
   PetscFunctionBegin;
   /* get work vectors needed by PIPEPRCG */
   ierr = KSPSetWorkVecs(ksp,9);CHKERRQ(ierr);
+
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode KSPSetFromOptions_PIPEPRCG(PetscOptionItems *PetscOptionsObject,KSP ksp)
+{
+  PetscInt       ierr=0;
+  KSP_CG_PIPE_PR *prcg=(KSP_CG_PIPE_PR*)ksp->data;
+  PetscBool      flag=PETSC_FALSE;
+
+  PetscFunctionBegin;
+  ierr = PetscOptionsHead(PetscOptionsObject,"KSP PIPEPRCG options");CHKERRQ(ierr);
+  PetscOptionsBool("-recompute_w","-recompute w_k with Ar_k? (default = True)","",prcg->rc_w_q,&prcg->rc_w_q,&flag);CHKERRQ(ierr);
+  if (!flag) prcg->rc_w_q = PETSC_TRUE;
+  ierr = PetscOptionsTail();CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
 
 /*
- KSPSolve_PIPEPRCG - This routine actually applies the pipelined conjugate gradient method
+ KSPSolve_PIPEPRCG - This routine actually applies the pipelined predict and recompute conjugate gradient method
 
  Input Parameter:
  .     ksp - the Krylov space object that was set to use conjugate gradient, by, for
@@ -28,17 +46,19 @@ static PetscErrorCode KSPSetUp_PIPEPRCG(KSP ksp)
 static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
 {
   PetscErrorCode ierr;
-  PetscInt       i, rcq = 1;
-  PetscScalar    alpha = 0.0, beta = 0.0, mu = 0.0, delta = 0.0, gamma = 0.0, nu = 0.0, nu_old = 0.0;
+  PetscInt       i;
+  KSP_CG_PIPE_PR *prcg=(KSP_CG_PIPE_PR*)ksp->data;
+  PetscScalar    alpha = 0.0, beta = 0.0, nu = 0.0, nu_old = 0.0, mudelgam[3], *mu_p, *delta_p, *gamma_p;
   PetscReal      dp    = 0.0;
-  Vec            X,B,R,RT,W,WT,P,S,ST,U,UT;
+  Vec            X,B,R,RT,W,WT,P,S,ST,U,UT,PRTST[3];
   Mat            Amat,Pmat;
-  PetscBool      diagonalscale;
- 
-  PetscOptionsGetInt(NULL,NULL,"-recompute_q",&rcq,NULL);
-  //printf("recompute Q: %d",rcq);
+  PetscBool      diagonalscale,rc_w_q=prcg->rc_w_q;
+
+  /* note that these are pointers to entries of muldelgam, different than nu */
+  mu_p=&mudelgam[0];delta_p=&mudelgam[1];gamma_p=&mudelgam[2];
 
   PetscFunctionBegin;
+  
   ierr = PCGetDiagonalScale(ksp->pc,&diagonalscale);CHKERRQ(ierr);
   if (diagonalscale) SETERRQ1(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"Krylov method %s does not support diagonal scaling",((PetscObject)ksp)->type_name);
 
@@ -77,17 +97,17 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
   ierr = KSP_PCApply(ksp,U,UT);CHKERRQ(ierr);        /*   ut <- Bu     */
   
   ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);
-  ierr = VecDotBegin(P,S,&mu);CHKERRQ(ierr);
-  ierr = VecDotBegin(ST,S,&gamma);CHKERRQ(ierr);
+  ierr = VecDotBegin(P,S,mu_p);CHKERRQ(ierr);
+  ierr = VecDotBegin(ST,S,gamma_p);CHKERRQ(ierr);
   
   ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);          /*   nu    <- (rt,r)  */
-  ierr = VecDotEnd(P,S,&mu);CHKERRQ(ierr);           /*   mu    <- (p,s)   */
-  ierr = VecDotEnd(ST,S,&gamma);CHKERRQ(ierr);       /*   gamma <- (st,s)  */
-  delta = mu;
+  ierr = VecDotEnd(P,S,mu_p);CHKERRQ(ierr);          /*   mu    <- (p,s)   */
+  ierr = VecDotEnd(ST,S,gamma_p);CHKERRQ(ierr);      /*   gamma <- (st,s)  */
+  *delta_p = *mu_p;
  
   i = 0;
   do {
-    
+
    /* Compute appropriate norm */  
    switch (ksp->normtype) {
      case KSP_NORM_PRECONDITIONED:
@@ -116,9 +136,9 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
     if (ksp->reason) break;
 
     /* update scalars */
-    alpha = nu/mu;
+    alpha = nu / *mu_p;
     nu_old = nu;
-    nu = nu_old-2*alpha*delta+(alpha*alpha)*gamma;    
+    nu = nu_old - 2*alpha*(*delta_p) + (alpha*alpha)*(*gamma_p);
     beta = nu/nu_old;
 
     /* update vectors */
@@ -130,31 +150,27 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
     ierr = VecAYPX(P,beta,RT);CHKERRQ(ierr);          /*   p  <- rt + beta  * p   */
     ierr = VecAYPX(S,beta,W);CHKERRQ(ierr);           /*   s  <- w  + beta  * s   */
     ierr = VecAYPX(ST,beta,WT);CHKERRQ(ierr);         /*   st <- wt + beta  * st  */
- 
-    /* start inner products and matrix products */
-    ierr = VecDotBegin(P,S,&mu);CHKERRQ(ierr);    
-    ierr = VecDotBegin(RT,S,&delta);CHKERRQ(ierr);
-    ierr = VecDotBegin(ST,S,&gamma);CHKERRQ(ierr);
+   
     ierr = VecDotBegin(RT,R,&nu);CHKERRQ(ierr);
+    
+    PRTST[0] = P; PRTST[1] = RT; PRTST[2] = ST;
 
-    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)S));CHKERRQ(ierr);
+    ierr = VecMDotBegin(S,3,PRTST,mudelgam);CHKERRQ(ierr);
+
+    ierr = PetscCommSplitReductionBegin(PetscObjectComm((PetscObject)R));CHKERRQ(ierr);
 
     ierr = KSP_MatMult(ksp,Amat,ST,U);CHKERRQ(ierr);  /*   u  <- A st             */
     ierr = KSP_PCApply(ksp,U,UT);CHKERRQ(ierr);       /*   ut <- B u              */
 
     /* predict-and-recompute */
-    /* how do we overlap this with the previous matvec? */
-    /* i.e. the equivalent of MDot */
-    if ( rcq ){
+    /* ideally this is combined with the previous matvec; i.e. equivalent of MDot */
+    if ( rc_w_q ) {
         ierr = KSP_MatMult(ksp,Amat,RT,W);CHKERRQ(ierr);  /*   w  <- A rt             */
         ierr = KSP_PCApply(ksp,W,WT);CHKERRQ(ierr);       /*   wt <- B w              */
     }
 
-    ierr = VecDotEnd(P,S,&mu);CHKERRQ(ierr);          /*   mu    <- (p,s)         */
-    ierr = VecDotEnd(RT,S,&delta);CHKERRQ(ierr);      /*   delta <- (p,s)         */
-    ierr = VecDotEnd(ST,S,&gamma);CHKERRQ(ierr);      /*   gamma <- (p,s)         */
-    ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);         /*   nu    <- (p,s)         */
-
+    ierr = VecDotEnd(RT,R,&nu);CHKERRQ(ierr);
+    ierr = VecMDotEnd(S,3,PRTST,mudelgam);CHKERRQ(ierr);
 
     i++;
     ksp->its = i;
@@ -168,8 +184,8 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
 /*MC
    KSPPIPEPRCG - Pipelined predict-and-recompute conjugate gradient method.
 
-   This method has only a single non-blocking reduction per iteration, compared to 2 blocking for standard CG.  The
-   non-blocking reduction is overlapped by the matrix-vector product and preconditioner application.
+   This method has only a single non-blocking reduction per iteration, compared to 2 blocking for standard CG.
+   The non-blocking reduction is overlapped by the matrix-vector product and preconditioner application.
 
    Level: intermediate
 
@@ -181,7 +197,7 @@ static PetscErrorCode  KSPSolve_PIPEPRCG(KSP ksp)
    Tyler Chen, University of Washington, Applied Mathematics Department
 
    Reference:
-   "Pipelined predict-and-recompute conjugate gradient variants". Tyler Chen. In preparation.
+   "Predict-and-recompute conjugate gradient variants". Tyler Chen and Erin C. Carson. In preparation.
 
    Acknowledgments:
    This material is based upon work supported by the National Science Foundation Graduate Research Fellowship Program under Grant No. DGE-1762114. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author and do not necessarily reflect the views of the National Science Foundation.
@@ -191,8 +207,16 @@ M*/
 PETSC_EXTERN PetscErrorCode KSPCreate_PIPEPRCG(KSP ksp)
 {
   PetscErrorCode ierr;
+  KSP_CG_PIPE_PR *prcg=NULL;
+  PetscBool      cite=PETSC_FALSE;
 
   PetscFunctionBegin;
+  
+  ierr = PetscCitationsRegister("@article{predict_and_recompute_cg,\n  author = {Tyler Chen and Erin C. Carson},\n  title = {Predict-and-recompute conjugate gradient variants},\n  journal = {},\n  year = {2020},\n  eprint = {1905.01549},\n  archivePrefix = {arXiv},\n  primaryClass = {cs.NA}\n}",&cite);CHKERRQ(ierr);
+  
+  ierr = PetscNewLog(ksp,&prcg);CHKERRQ(ierr);
+  ksp->data = (void*)prcg;
+
   ierr = KSPSetSupportedNorm(ksp,KSP_NORM_UNPRECONDITIONED,PC_LEFT,2);CHKERRQ(ierr);
   ierr = KSPSetSupportedNorm(ksp,KSP_NORM_PRECONDITIONED,PC_LEFT,2);CHKERRQ(ierr);
   ierr = KSPSetSupportedNorm(ksp,KSP_NORM_NATURAL,PC_LEFT,2);CHKERRQ(ierr);
@@ -202,8 +226,9 @@ PETSC_EXTERN PetscErrorCode KSPCreate_PIPEPRCG(KSP ksp)
   ksp->ops->solve          = KSPSolve_PIPEPRCG;
   ksp->ops->destroy        = KSPDestroyDefault;
   ksp->ops->view           = 0;
-  ksp->ops->setfromoptions = 0;
+  ksp->ops->setfromoptions = KSPSetFromOptions_PIPEPRCG;
   ksp->ops->buildsolution  = KSPBuildSolutionDefault;
   ksp->ops->buildresidual  = KSPBuildResidualDefault;
   PetscFunctionReturn(0);
 }
+

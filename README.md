@@ -5,4 +5,4 @@ This repository contains materials to reproduce a variety of papers regarding hi
 
 ## Contents
 
-- `predict_and_recompute`: Predict-and-recompute conjugate gradient variants. **Tyler Chen**. In preparation.
+- `predict_and_recompute`: Predict-and-recompute conjugate gradient variants. **Tyler Chen and Erin C. Carson**. arXiv preprint: 1905.01549.
