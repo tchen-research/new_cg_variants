@@ -45,7 +45,7 @@ def pipe_pr_cg(comm,A,b,max_iter):
     nup_part = np.ndarray.view(data_part[-1:,1]) 
 
     # need to set w = Ab : use t_part and t_full for convenience
-    data_part[:m*size,0] = np.dot(A,r)
+    data_part[:m*size,0] = A@r#np.dot(A,r)
     comm.Allreduce([data_part,MPI.DOUBLE],[data,MPI.DOUBLE],op=MPI.SUM)
     #w[:] = data[rank*m:(rank+1)*m,0]
     rs[:,1] = data[rank*m:(rank+1)*m,0]
@@ -62,7 +62,7 @@ def pipe_pr_cg(comm,A,b,max_iter):
         gamma_part[:] = np.dot(s,s)
         nup_part[:] = np.dot(r,r)
                
-        np.dot(A,rs,out=u_wp_part)
+        data_part[:m*size] = A@rs #np.dot(A,rs,out=u_wp_part)
         
         comm.Allreduce([data_part,MPI.DOUBLE],[data,MPI.DOUBLE],op=MPI.SUM)
 

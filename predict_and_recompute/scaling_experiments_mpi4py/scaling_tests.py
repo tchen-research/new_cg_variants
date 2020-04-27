@@ -3,6 +3,7 @@
 
 from mpi4py import MPI
 import numpy as np
+import scipy as sp
 import sys
 
 from cg_variants import hs_cg, cg_cg, gv_cg, pr_cg, pipe_pr_cg
@@ -53,6 +54,22 @@ A = np.zeros((n,n//size),dtype='float') # maybe make very small in case zeros so
 # fill in diagonal blocks of A with eigenvalues of model problem
 A[rank*(n//size):(rank+1)*(n//size)] += np.diag(b)
 
+
+small_off_diagonals = np.zeros_like(A)
+
+if rank == 0:
+    small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),1)
+    small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),)
+elif rank == size-1:
+    small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),-1)
+    small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),)
+else:
+    small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),)
+    small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),)
+
+# tridiagonal matrix
+A_sparse = sp.sparse.csc_matrix(A + 1e-100*small_off_diagonals)
+
 # normalize b so solution is constant
 b /= np.sqrt(n)
 
@@ -69,21 +86,27 @@ max_iter = int(sys.argv[2])
 for variant in variants:
     comm.Barrier()
     sol,t = variant(comm,A,b,max_iter)
+    sol_sparse,t_sparse = variant(comm,A_sparse,b,max_iter)
 
     sol_raw = None
+    sol_sparse_raw = None
     if rank == 0:
         sol_raw = np.empty([size, n//size], dtype='float')
+        sol_sparse_raw = np.empty([size, n//size], dtype='float')
     comm.Gather(sol, sol_raw, root=0)
+    comm.Gather(sol_sparse, sol_sparse_raw, root=0)
 
     if rank==0:
 
         sol_raw = np.reshape(sol_raw,(n))
+        sol_sparse_raw = np.reshape(sol_sparse_raw,(n))
         error = np.linalg.norm(np.ones(n)/np.sqrt(n)-sol_raw)
-        print("{} error: {}".format(variant.__name__,error))
+        error_sparse = np.linalg.norm(np.ones(n)/np.sqrt(n)-sol_sparse_raw)
+        print("{} error: {}, {}".format(variant.__name__,error,error_sparse))
 
         ## now save results
-        res = {"error":error,"timings":t}
-        np.save("./data/{}/{}_{}".format(n,variant.__name__,trial_name),res,allow_pickle=True)
+#        res = {"error":error,"timings":t}
+#        np.save("./data/{}/{}_{}".format(n,variant.__name__,trial_name),res,allow_pickle=True)
 
 
 
