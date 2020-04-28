@@ -46,7 +46,7 @@ def hs_cg(comm,A,b,max_iter):
         p *= beta
         p += r
         
-        s_part = A@p
+        A.dot(p,out=s_part)#s_part = A@p
 
         comm.Allreduce([s_part,MPI.DOUBLE],[s_full,MPI.DOUBLE],op=MPI.SUM)
 

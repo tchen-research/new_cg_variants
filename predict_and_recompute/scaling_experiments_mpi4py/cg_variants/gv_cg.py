@@ -39,7 +39,7 @@ def gv_cg(comm,A,b,max_iter):
 
 
     # need to set w = Ab : use t_part and t_full for convenience
-    t_nu_eta_part[:m*size] = A@r
+    t_nu_eta_part[:m*size] = A.dot(r)
     comm.Allreduce([t_nu_eta_part,MPI.DOUBLE],[t_nu_eta,MPI.DOUBLE],op=MPI.SUM)
     w[:] = t_nu_eta[rank*m:(rank+1)*m]
     
@@ -54,7 +54,7 @@ def gv_cg(comm,A,b,max_iter):
         
         nu_part[:] = np.dot(r,r)
         eta_part[:] = np.dot(r,w)
-        t_nu_eta_part[:m*size] = A@w #np.dot(A,w,out=t_part)#_nu_eta_part[:m*size])
+        A.dot(w,out=t_part)#t_nu_eta_part[:m*size] = A@w #np.dot(A,w,out=t_part)#_nu_eta_part[:m*size])
         
         comm.Allreduce([t_nu_eta_part,MPI.DOUBLE],[t_nu_eta,MPI.DOUBLE],op=MPI.SUM)
 
