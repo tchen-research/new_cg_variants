@@ -45,7 +45,7 @@ def cg_cg(comm,A,b,max_iter):
 
     for k in range(max_iter):
  
-        A.dot(r,out=w_part)#w_part = A@r#np.dot(A,r,out=w_part)
+        w_part[:] = A.dot(r)
 
         comm.Allreduce([w_part,MPI.DOUBLE],[w_full,MPI.DOUBLE],op=MPI.SUM)	
 

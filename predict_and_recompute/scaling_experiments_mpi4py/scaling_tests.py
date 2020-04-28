@@ -36,51 +36,17 @@ rho = 0.9
 
 lambda1 = 1/kappa
 lambdan = 1
-Lambda = lambda1+(lambdan-lambda1)*np.arange(n)/(n-1)*rho**np.arange(n-1,-1,-1,dtype='float')
-#Lambda = lambda1+(lambdan-lambda1)*np.arange(n)/(n-1)*rho**(n-np.arange(n)-1)
-Lambda = lambda1+(lambdan-lambda1)*np.arange(rank*(n//size),(rank+1)*(n//size))/(n-1)*rho**(n-np.arange(rank*(n//size),(rank+1)*(n//size)))
+
+Lambda = lambda1+(lambdan-lambda1)*np.arange(rank*(n//size),(rank+1)*(n//size))/(n-1)*rho**(n-np.arange(rank*(n//size),(rank+1)*(n//size))-1)
 
 b = np.empty(n//size,dtype='float')
-#b = Lambda[rank*(n//size):(rank+1)*(n//size)]
 b[:] = Lambda
 
-sparsity_q = False
-bandwidth = int(sys.argv[4])
+# allocate A as zeros
+A = np.zeros((n,n//size),dtype='float') # maybe make very small in case zeros somehow speed things up
 
-if bandwidth == -1:
-    # allocate A as zeros
-    A = np.zeros((n,n//size),dtype='float') # maybe make very small in case zeros somehow speed things up
-
-    # fill in diagonal blocks of A with eigenvalues of model problem
-    A[rank*(n//size):(rank+1)*(n//size)] += np.diag(b)
-
-else:
-    """class block_mat:
-
-        def __init__(self,data):
-            self.data = data
-      
-        def dot(self,x,out=None):
-
-            if len(x.shape) == 1:
-                y = np.zeros(n)
-            else:
-                y = np.zeros((n,x.shape[1]))
-
-            self.data.dot(x,out=y[rank*(n//size):(rank+1)*(n//size)])
-            return y
-    
-    A = block_mat(np.diag(b))
-    """
-
-    # half bandwidth
-    data = 1e-100*np.ones((2*bandwidth+1,n//size))
-    data[0] = b
-
-    offsets = np.hstack([[0],np.arange(1,bandwidth+1),-np.arange(1,bandwidth+1)])
-    offsets -= rank*(n//size)
-    A = sp.sparse.dia_matrix( (data,offsets), shape=(n,n//size)).tocsr()
-
+# fill in diagonal blocks of A with eigenvalues of model problem
+A[rank*(n//size):(rank+1)*(n//size)] += np.diag(b)
 
 # normalize b so solution is constant
 b /= np.sqrt(n)
@@ -112,6 +78,6 @@ for variant in variants:
         print("{}, error:{}, time:{}".format(variant.__name__,error,t['tot']))
         
         ## now save results
-        res = {"error":error,"timings":t,"sparse":bandwidth}
+        res = {"error":error,"timings":t}
         np.save("./data/{}/{}_{}".format(n,variant.__name__,trial_name),res,allow_pickle=True)
 

@@ -21,49 +21,51 @@ def pipe_pr_cg(comm,A,b,max_iter):
     nu = np.zeros((1))
 
     x = np.zeros_like(b)
-    rs = np.zeros((m,2))
-    rs[:,0] = b
+    rs = np.zeros((2,m))
+    rs[0,:] = b
     p = np.copy(b)
-    r = np.ndarray.view(rs[:,0])
-    s = np.ndarray.view(rs[:,1])
+    r = np.ndarray.view(rs[0,:])
+    s = np.ndarray.view(rs[1,:])
     w = np.zeros_like(b)
 
-    data = np.ones((m*size+2,2))
-    data_part = np.ones((m*size+2,2)) # w' u mu delta gamma nu'
-    
-    wp = np.ndarray.view(data[rank*m:(rank+1)*m,0])
-    u = np.ndarray.view(data[rank*m:(rank+1)*m,1])
-    mu = np.ndarray.view(data[-2:-1,0]) 
-    delta = np.ndarray.view(data[-2:-1,1]) 
-    gamma = np.ndarray.view(data[-1:,0]) 
-    nup = np.ndarray.view(data[-1:,1]) 
+    data = np.ones((2,m*size+2))
+    data_part = np.ones((2,m*size+2)) # w' u mu delta gamma nu'
 
-    u_wp_part = np.ndarray.view(data_part[:m*size])
-    mu_part = np.ndarray.view(data_part[-2:-1,0]) 
-    delta_part = np.ndarray.view(data_part[-2:-1,1]) 
-    gamma_part = np.ndarray.view(data_part[-1:,0]) 
-    nup_part = np.ndarray.view(data_part[-1:,1]) 
+    wp = np.ndarray.view(data[0,rank*m:(rank+1)*m])
+    u = np.ndarray.view(data[1,rank*m:(rank+1)*m])
+    mu = np.ndarray.view(data[0,-2:-1])
+    delta = np.ndarray.view(data[1,-2:-1])
+    gamma = np.ndarray.view(data[0,-1:])
+    nup = np.ndarray.view(data[1,-1:])
+
+    u_wp_part = np.ndarray.view(data_part[:,:m*size])
+    mu_part = np.ndarray.view(data_part[0,-2:-1])
+    delta_part = np.ndarray.view(data_part[1,-2:-1])
+    gamma_part = np.ndarray.view(data_part[0,-1:])
+    nup_part = np.ndarray.view(data_part[1,-1:])
 
     # need to set w = Ab : use t_part and t_full for convenience
-    data_part[:m*size,0] = A.dot(r)#np.dot(A,r)
+    data_part[0,:m*size] = A.dot(r)#np.dot(A,r)
     comm.Allreduce([data_part,MPI.DOUBLE],[data,MPI.DOUBLE],op=MPI.SUM)
     #w[:] = data[rank*m:(rank+1)*m,0]
-    rs[:,1] = data[rank*m:(rank+1)*m,0]
-    
+    rs[1,:] = data[0,rank*m:(rank+1)*m]
+
     # wait for all processes to reach this point, then begin timing
     comm.Barrier()
     if rank==0:
-        times['tot'] -= MPI.Wtime()    
-    
+        times['tot'] -= MPI.Wtime()
+
     for k in range(max_iter):
-        
+
         mu_part[:] = np.dot(p,s)
         delta_part[:] = np.dot(r,s)
         gamma_part[:] = np.dot(s,s)
         nup_part[:] = np.dot(r,r)
-               
-        A.dot(rs,out=u_wp_part)# = A@rs #np.dot(A,rs,out=u_wp_part)
-        
+
+        u_wp_part[:] = rs.dot(A.T)
+        #u_wp_part[0] = A.dot(r)
+        #u_wp_part[1] = A.dot(s)
+
         comm.Allreduce([data_part,MPI.DOUBLE],[data,MPI.DOUBLE],op=MPI.SUM)
 
         nu_[:] = nup       

@@ -48,7 +48,8 @@ def pr_cg(comm,A,b,max_iter):
     
     for k in range(max_iter):
         
-        A.dot(p,out=s_part)#s_part = A@p#np.dot(A,p,out=s_part) #s
+        s_part[:] = A.dot(p)
+ 
         comm.Allreduce([s_part,MPI.DOUBLE],[s_full,MPI.DOUBLE],op=MPI.SUM)
         
         mu_part[:] = np.dot(p,s)
