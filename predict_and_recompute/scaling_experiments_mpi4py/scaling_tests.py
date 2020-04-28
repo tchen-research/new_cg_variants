@@ -27,90 +27,91 @@ trial_name = sys.argv[3]
 n = int(sys.argv[1])
 assert n%size == 0, "n must be a multiple of the number of processes"
 
-# solution is constant vector of unit length
 if rank == 0:
-    kappa = 1e6
-    rho = 0.9
-    
-    lambda1 = 1/kappa
-    lambdan = 1
-    Lambda = lambda1+(lambdan-lambda1)*np.arange(n)/(n-1)*rho**np.arange(n-1,-1,-1,dtype='float')
-    sendbuf = Lambda.reshape(size,-1)
-else:
-    Lambda = None
-    sendbuf = None
+    print("start setting up on {} ranks".format(size))
 
-comm.Barrier()
-if rank == 0:
-    print("trial name: {}".format(trial_name))
-    print("start distributing to {} ranks".format(size))
+# solution is constant vector of unit length
+kappa = 1e6
+rho = 0.9
+
+lambda1 = 1/kappa
+lambdan = 1
+Lambda = lambda1+(lambdan-lambda1)*np.arange(n)/(n-1)*rho**np.arange(n-1,-1,-1,dtype='float')
+#Lambda = lambda1+(lambdan-lambda1)*np.arange(n)/(n-1)*rho**(n-np.arange(n)-1)
+Lambda = lambda1+(lambdan-lambda1)*np.arange(rank*(n//size),(rank+1)*(n//size))/(n-1)*rho**(n-np.arange(rank*(n//size),(rank+1)*(n//size)))
 
 b = np.empty(n//size,dtype='float')
-comm.Scatter(sendbuf,b, root=0)
+#b = Lambda[rank*(n//size):(rank+1)*(n//size)]
+b[:] = Lambda
 
-# allocate A as zeros
-A = np.zeros((n,n//size),dtype='float') # maybe make very small in case zeros somehow speed things up
+sparsity_q = False
+bandwidth = int(sys.argv[4])
 
-# fill in diagonal blocks of A with eigenvalues of model problem
-A[rank*(n//size):(rank+1)*(n//size)] += np.diag(b)
+if bandwidth == -1:
+    # allocate A as zeros
+    A = np.zeros((n,n//size),dtype='float') # maybe make very small in case zeros somehow speed things up
 
+    # fill in diagonal blocks of A with eigenvalues of model problem
+    A[rank*(n//size):(rank+1)*(n//size)] += np.diag(b)
 
-small_off_diagonals = np.zeros_like(A)
-
-if size > 1:
-    if rank == 0:
-        small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),1)
-        small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),0)
-    elif rank == size-1:
-        small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),-1)
-        small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),0)
-    else:
-        small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),0)
-        small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),0)
 else:
-    small_off_diagonals += np.diag(np.ones(n-1),1) + np.diag(np.ones(n-1),-1)
+    """class block_mat:
 
-# tridiagonal matrix
-A_sparse = sp.sparse.csc_matrix(A + 1e-100*small_off_diagonals)
+        def __init__(self,data):
+            self.data = data
+      
+        def dot(self,x,out=None):
+
+            if len(x.shape) == 1:
+                y = np.zeros(n)
+            else:
+                y = np.zeros((n,x.shape[1]))
+
+            self.data.dot(x,out=y[rank*(n//size):(rank+1)*(n//size)])
+            return y
+    
+    A = block_mat(np.diag(b))
+    """
+
+    # half bandwidth
+    data = 1e-100*np.ones((2*bandwidth+1,n//size))
+    data[0] = b
+
+    offsets = np.hstack([[0],np.arange(1,bandwidth+1),-np.arange(1,bandwidth+1)])
+    offsets -= rank*(n//size)
+    A = sp.sparse.dia_matrix( (data,offsets), shape=(n,n//size)).tocsr()
+
 
 # normalize b so solution is constant
 b /= np.sqrt(n)
 
 comm.Barrier()
 if rank == 0:
-    print("done distributing")
+    print("done setting up")
 
 
 variants = [hs_cg,cg_cg,gv_cg,pr_cg,pipe_pr_cg]
-
+#variants = [gv_cg,pipe_pr_cg]
 
 max_iter = int(sys.argv[2])
 
 for variant in variants:
     comm.Barrier()
     sol,t = variant(comm,A,b,max_iter)
-    sol_sparse,t_sparse = variant(comm,A_sparse,b,max_iter)
 
     sol_raw = None
-    sol_sparse_raw = None
     if rank == 0:
         sol_raw = np.empty([size, n//size], dtype='float')
-        sol_sparse_raw = np.empty([size, n//size], dtype='float')
     comm.Gather(sol, sol_raw, root=0)
-    comm.Gather(sol_sparse, sol_sparse_raw, root=0)
 
     if rank==0:
 
         sol_raw = np.reshape(sol_raw,(n))
-        sol_sparse_raw = np.reshape(sol_sparse_raw,(n))
         error = np.linalg.norm(np.ones(n)/np.sqrt(n)-sol_raw)
-        error_sparse = np.linalg.norm(np.ones(n)/np.sqrt(n)-sol_sparse_raw)
-        print("{} error: {}, {}".format(variant.__name__,error,error_sparse))
 
+        print("{}, error:{}, time:{}".format(variant.__name__,error,t['tot']))
+        
         ## now save results
-#        res = {"error":error,"timings":t}
-#        np.save("./data/{}/{}_{}".format(n,variant.__name__,trial_name),res,allow_pickle=True)
-
-
-
+        res = {"error":error,"timings":t,"sparse":bandwidth}
+        np.save("./data/{}/{}_{}".format(n,variant.__name__,trial_name),res,allow_pickle=True)
 
