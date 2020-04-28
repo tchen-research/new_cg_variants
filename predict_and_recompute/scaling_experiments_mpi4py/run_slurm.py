@@ -16,7 +16,7 @@ def get_slurm_script(nodes,cores,name,time):
 #SBATCH --ntasks-per-node={1}
 #SBATCH --mem=10G
 #SBATCH --time={3}
-#SBATCH --workdir=/gscratch/stf/chentyl/mpi4py_cg/
+##SBATCH --workdir=/gscratch/stf/chentyl/new_cg_variants/predict_and_recompute/scaling_experiments_mpi4py
 #SBATCH --export=all
 module load contrib/anaconda3.4.2
 module load icc_18-impi_2018
@@ -35,10 +35,10 @@ echo "==========================================================================
     return slurm_settings
 
 
-n_cores = 16
+n_cores = 8
 node_list = [1,2,4,6,8,10,12,16,24,32]
 node_list = [1,2,4,6,8,12,16,24,32,48]
-node_list = [48,16,4,24,8,24,32,2,1]
+node_list = [16,4,24,8,24,32,2,1]
 max_trials = 8
 n = 1536*8#10#7
 max_iter = 1500

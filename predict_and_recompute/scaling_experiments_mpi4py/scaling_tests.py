@@ -57,15 +57,18 @@ A[rank*(n//size):(rank+1)*(n//size)] += np.diag(b)
 
 small_off_diagonals = np.zeros_like(A)
 
-if rank == 0:
-    small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),1)
-    small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),)
-elif rank == size-1:
-    small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),-1)
-    small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),)
+if size > 1:
+    if rank == 0:
+        small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),1)
+        small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),0)
+    elif rank == size-1:
+        small_off_diagonals[rank*(n//size):(rank+1)*(n//size)] += np.diag(np.ones(n//size-1),-1)
+        small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),0)
+    else:
+        small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),0)
+        small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),0)
 else:
-    small_off_diagonals[rank*(n//size)+1:(rank+1)*(n//size)+1] += np.diag(np.ones(n//size),)
-    small_off_diagonals[rank*(n//size)-1:(rank+1)*(n//size)-1] += np.diag(np.ones(n//size),)
+    small_off_diagonals += np.diag(np.ones(n-1),1) + np.diag(np.ones(n-1),-1)
 
 # tridiagonal matrix
 A_sparse = sp.sparse.csc_matrix(A + 1e-100*small_off_diagonals)
