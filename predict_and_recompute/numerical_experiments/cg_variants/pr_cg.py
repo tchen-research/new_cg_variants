@@ -65,7 +65,7 @@ def pr_master_cg(A,b,x0,max_iter,variant='',callbacks=[],**kwargs):
         p_k    =  r_k   +    b_k * p_k1
         s_k    =  A     @ p_k
         mu_k   =  p_k   @ s_k 
-        del_k  =  r_k   @ st_k
+        del_k  =  r_k   @ s_k
         gam_k  =  s_k   @ s_k
         nu_k   =  r_k   @ r_k
         a_k    =  nu_k / mu_k
